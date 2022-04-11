@@ -1,7 +1,8 @@
 ﻿using System;
-using System.Text.Json;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+using System.Threading;
 
 namespace Console_Mod_Manager
 {
@@ -17,10 +18,10 @@ namespace Console_Mod_Manager
         public CommandParser profileCommands;
 
         public string lastCommandOutput = "";
+        private bool canAbort = true;
 
         static void Main(string[] args)
         {
-           
             Program p = new Program();
             p.Init();
             p.Run();
@@ -28,13 +29,12 @@ namespace Console_Mod_Manager
 
         public void Init()
         {
-           profileCommands = new CommandParser(DisplayHelp,
-           new Command("create", "Creates a new profile", "create\ncreate <name>\ncreate <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
-           new Command("delete", "Deletes a profile", "delete <index>\ndelete <name>", C_DeleteProfile, "de", "d", "del"),
-           new Command("enter", "Enters a profile", "enter <index>\nenter <name>", C_EnterProfile, "en", "e"),
-           new Command("rename", "Renames a profile", "rename <old_name> <new_name>\nrename <index> <new_name>", C_RenameProfile, "re", "r")
-           );
-
+            profileCommands = new CommandParser(DisplayHelp,
+            new Command("create", "Creates a new profile", "create\ncreate <name>\ncreate <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
+            new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del"),
+            new Command("enter", "Enters a profile", "enter <index>", C_EnterProfile, "en", "e"),
+            new Command("rename", "Renames a profile", "rename\nrename <index> <new_name>", C_RenameProfile, "re", "r")
+            );
         }
 
         public void Run()
@@ -52,7 +52,8 @@ namespace Console_Mod_Manager
             {
                 //Execute the start action
                 startAction();
-                
+
+                Console.ForegroundColor = ConsoleColor.Gray;
                 //Displays all the commands
                 Console.WriteLine($"Enter a command ({commandParser.ParseToString('/')}) or 'exit' to exit");
 
@@ -86,12 +87,16 @@ namespace Console_Mod_Manager
                 //Asks for user input
                 answer = Console.ReadLine();
 
-                //Self explanatory
-                if(answer == "exit") break;
-                
-                
+                if(answer == "exit") break; //Self explanatory
+                else if(string.IsNullOrEmpty(answer) || string.IsNullOrWhiteSpace(answer)) //If the command is empty, don't do anything
+                {
+                    Console.Clear();
+                    continue;
+                }
+
                 try //Tries to execute the command
                 {
+                    Console.WriteLine();
                     commandParser.TryExecute(answer);
                 }
                 catch(Exception e) //If it fails, it saves the error message in red
@@ -100,7 +105,7 @@ namespace Console_Mod_Manager
                 }
 
                 Console.Clear();
-                
+
             } while(answer != "exit");
         }
 
@@ -134,103 +139,119 @@ namespace Console_Mod_Manager
 
         public void C_DeleteProfile(string[] args)
         {
+            if(args.Length == 0) throw new Exception("No index specified");
+            else if(args.Length > 1) throw new Exception("Too many arguments");
 
+            Profile profile = GetProfile(args[0]);
+            int index = int.Parse(args[0]);
+
+            ConsoleColor prevColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            //Asks for confirmation, if no, then cancel
+            if(!YesNoAnswer($"Are you sure you want to delete '{profile.Name}'?"))
+            {
+                lastCommandOutput = "&rCancelled";
+                Console.ForegroundColor = prevColor;
+                return;
+            }
+            Console.ForegroundColor = prevColor;
+
+            profiles.RemoveAt(index);
+            lastCommandOutput = $"&gDeleted profile '{profile.Name}'";
+            SaveProfiles();
         }
 
         public void C_EnterProfile(string[] args)
         {
-
+            lastCommandOutput = "&mNot implemented";
         }
 
         public void C_RenameProfile(string[] args)
         {
+            if(args.Length == 0) throw new Exception("No index specified");
+            else if(args.Length > 2) throw new Exception("Too many arguments");
 
+            Profile profile = GetProfile(args[0]);
+
+            string name = args.Length == 2 ? args[1] : "";
+            if(name == "")
+            {
+                ClearLine();
+                Console.Write("Name: ");
+                name = Console.ReadLine().Trim();
+            }
+
+            if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
+            profile.Name = name;
+            lastCommandOutput = $"&gProfile renamed to '{profile.Name}'";
         }
         #endregion
 
+        public Profile GetProfile(string index)
+        {
+            int i;
+            if(int.TryParse(index, out i))
+            {
+                return GetProfile(i);
+            }
+            else
+            {
+                throw new Exception("Please enter a number");
+            }
+        }
+        public Profile GetProfile(int index)
+        {
+            if(index >= profiles.Count) throw new Exception("Index out of range");
+            else if(index < 0) throw new Exception("Index must be positive");
+            return profiles[index];
+        }
+
         public void CreateProfile(string name = "", string modsFolder = "", string unusedModsFolder = "", string executablePath = "")
         {
-            Console.WriteLine();
+            //Name
             if(name == "")
             {
-                do
-                {
-                    ClearLine();
-                    Console.Write("Name: ");
-                    name = Console.ReadLine().Trim();
-
-                    if(string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(name))
-                    {
-                        Console.Write("Name cannot be empty");
-                        Console.CursorTop -= 1;
-                    }
-                }
-                while(string.IsNullOrWhiteSpace(name) || string.IsNullOrEmpty(name));
+                ClearLine();
+                Console.Write("Name: ");
+                name = Console.ReadLine().Trim();
 
             }
             if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
 
+            //Mods folder
             if(modsFolder == "")
             {
-                do
-                {
-                    ClearLine();
-                    Console.Write("Mods folder: ");
-                    modsFolder = Console.ReadLine().Trim().Replace("\"", "");
-                    
-                    if(!Directory.Exists(modsFolder))
-                    {
-                        Console.Write("Folder does not exist");
-                        Console.CursorTop -= 1;
-                    }
-                }
-                while(!Directory.Exists(modsFolder));
-               
+                ClearLine();
+                Console.Write("Mods folder: ");
+                modsFolder = Console.ReadLine().Trim().Replace("\"", "");
             }
             if(!Directory.Exists(modsFolder)) throw new DirectoryNotFoundException($"Directory '{modsFolder}' does not exist");
-            
+
+            //Unused mods folder
             if(unusedModsFolder == "")
             {
-                do
-                {
-                    ClearLine();
-                    Console.Write("Unused mods folder: ");
-                    unusedModsFolder = Console.ReadLine().Trim().Replace("\"", "");
+                ClearLine();
+                Console.Write("Unused mods folder: ");
+                unusedModsFolder = Console.ReadLine().Trim().Replace("\"", "");
 
-                    if(!Directory.Exists(unusedModsFolder))
-                    {
-                        Console.Write("Folder does not exist");
-                        Console.CursorTop -= 1;
-                    }
-                }
-                while(!Directory.Exists(unusedModsFolder));
             }
             if(!Directory.Exists(unusedModsFolder)) throw new DirectoryNotFoundException($"Directory '{unusedModsFolder}' does not exist");
-            
+            if(Path.GetFullPath(modsFolder).Equals(Path.GetFullPath(unusedModsFolder))) throw new Exception("The mods folder and unused mods folder cannot be the same");
+
+            //Executable
             if(executablePath == "")
             {
-                do
-                {
-                    ClearLine();
-                    Console.Write("Executable path (Empty for none): ");
-                    executablePath = Console.ReadLine().Trim().Replace("\"", "");
-                    if(executablePath == "") { executablePath = null; break; }
-
-                    if(!File.Exists(executablePath))
-                    {
-                        Console.Write("File does not exist");
-                        Console.CursorTop -= 1;
-                    }
-                }
-                while(!File.Exists(executablePath));
-               
+                ClearLine();
+                Console.Write("Executable path (Empty for none): ");
+                executablePath = Console.ReadLine().Trim().Replace("\"", "");
+                if(executablePath == "") executablePath = null;
             }
-            if(!File.Exists(executablePath)) throw new FileNotFoundException($"File '{executablePath}' does not exist");
+            if(executablePath != null && !File.Exists(executablePath)) throw new FileNotFoundException($"File '{executablePath}' does not exist");
 
             profiles.Add(new Profile(name, modsFolder, unusedModsFolder, executablePath));
             SaveProfiles();
         }
-        
+
         public void DisplayProfiles()
         {
             ConsoleColor prevColor = Console.ForegroundColor;
@@ -240,7 +261,7 @@ namespace Console_Mod_Manager
 
             if(profiles.Count == 0)
             {
-                Console.WriteLine("0 profiles.");
+                Console.WriteLine("No profiles.");
                 Console.WriteLine();
                 return;
             }
@@ -253,11 +274,11 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = prevColor;
             Console.WriteLine();
         }
-        public void LoadProfiles() 
+        public void LoadProfiles()
         {
             Console.WriteLine("Loading profiles...");
             string message = "";
-            
+
             if(!File.Exists(profilesPath))
             {
                 profiles = new List<Profile>();
@@ -274,14 +295,14 @@ namespace Console_Mod_Manager
                     profiles = new List<Profile>();
                     message = "Error while loading profiles: " + e.Message;
                 }
-               
+
             }
 
             Console.Clear();
             if(message != "") Console.WriteLine(message);
-            Console.WriteLine(profiles.Count == 0? "No profiles loaded":"Loaded " + profiles.Count + " profiles.");
+            Console.WriteLine(profiles.Count == 0 ? "No profiles found" : "Loaded " + profiles.Count + " profiles.");
         }
-        public void SaveProfiles() 
+        public void SaveProfiles()
         {
             try
             {
@@ -302,14 +323,43 @@ namespace Console_Mod_Manager
 
         public void DisplayHelp(string help)
         {
-            ConsoleColor prevColor = Console.ForegroundColor; 
+            ConsoleColor prevColor = Console.ForegroundColor;
 
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("\n" + help);
-            
+
             Console.ForegroundColor = prevColor;
             Console.Write("\n(Enter to continue)");
             Console.ReadLine();
+        }
+
+        public bool YesNoAnswer(string question)
+        {
+            Console.WriteLine(question + "(y/n)");
+            ConsoleKeyInfo key;
+            do
+            {
+                key = Console.ReadKey(true);
+                if(key.KeyChar == 'y') { Console.WriteLine("y"); return true; }
+                if(key.KeyChar == 'n') { Console.WriteLine("n"); return false; }
+            } while(key.Key != ConsoleKey.Escape);
+
+            Console.WriteLine("Esc");
+            throw new Exception("Cancelled");
+        }
+
+        /// <summary>
+        /// If the user presses ESC, the application throws an error. Used to force stop processes
+        /// </summary>
+        public void BackgroundAbortCheck()
+        {
+            ConsoleKeyInfo key;
+            while(true)
+            {
+                Thread.Sleep(500);
+                key = Console.ReadKey(true);
+                if(canAbort && key.Key == ConsoleKey.Escape) throw new Exception("Aborted");
+            }
         }
     }
 }
