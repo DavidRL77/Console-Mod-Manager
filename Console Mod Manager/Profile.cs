@@ -12,7 +12,16 @@ namespace Console_Mod_Manager
         public string Name { get; set; }
         public string ModsPath { get; set; }
         public string UnusedModsPath { get; set; }
-        public string ExecutablePath { get; set; }
+        public string ExecutablePath
+        {
+            get
+            {
+                if(executablePath == null) return "None";
+                else return executablePath;
+            }
+            set { executablePath =  value; }
+        }
+        private string executablePath;
 
 
         public Profile(string name, string modsPath, string unusedModsPath, string executablePath = null)

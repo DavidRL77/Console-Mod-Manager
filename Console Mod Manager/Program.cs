@@ -33,6 +33,7 @@ namespace Console_Mod_Manager
             new Command("create", "Creates a new profile", "create\ncreate <name>\ncreate <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
             new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del"),
             new Command("change", "Changes the path of a folder in a profile", "edit mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
+            new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
             new Command("enter", "Enters a profile", "enter <index>", C_EnterProfile, "en", "e"),
             new Command("rename", "Renames a profile", "rename\nrename <index> <new_name>", C_RenameProfile, "re", "r")
             );
@@ -237,6 +238,42 @@ namespace Console_Mod_Manager
             lastCommandOutput = $"&gEdited profile '{profile.Name}'";
         }
 
+        public void C_DetailsProfile(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index specified");
+            else if(args.Length > 1) throw new Exception("Too many arguments");
+
+            Profile profile = GetProfile(args[0]);
+            ConsoleColor prevColor = Console.ForegroundColor;
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{profile.Name}:");
+
+            //Mods
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Mods Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.ModsPath);
+
+            //Unused mods
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Unused Mods Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.UnusedModsPath);
+
+            //Executable
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Executable Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.ExecutablePath);
+
+
+            Console.ForegroundColor = prevColor;
+
+            Console.Write("\n\n(Enter to continue)");
+            Console.ReadLine();
+        }
+
         public void C_EnterProfile(string[] args)
         {
             lastCommandOutput = "&mNot implemented";
@@ -422,20 +459,6 @@ namespace Console_Mod_Manager
 
             Console.WriteLine("Esc");
             throw new Exception("Cancelled");
-        }
-
-        /// <summary>
-        /// If the user presses ESC, the application throws an error. Used to force stop processes
-        /// </summary>
-        public void BackgroundAbortCheck()
-        {
-            ConsoleKeyInfo key;
-            while(true)
-            {
-                Thread.Sleep(500);
-                key = Console.ReadKey(true);
-                if(canAbort && key.Key == ConsoleKey.Escape) throw new Exception("Aborted");
-            }
         }
     }
 }
