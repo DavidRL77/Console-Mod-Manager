@@ -32,6 +32,7 @@ namespace Console_Mod_Manager
             profileCommands = new CommandParser(DisplayHelp,
             new Command("create", "Creates a new profile", "create\ncreate <name>\ncreate <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
             new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del"),
+            new Command("change", "Changes the path of a folder in a profile", "edit mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
             new Command("enter", "Enters a profile", "enter <index>", C_EnterProfile, "en", "e"),
             new Command("rename", "Renames a profile", "rename\nrename <index> <new_name>", C_RenameProfile, "re", "r")
             );
@@ -159,6 +160,81 @@ namespace Console_Mod_Manager
             profiles.RemoveAt(index);
             lastCommandOutput = $"&gDeleted profile '{profile.Name}'";
             SaveProfiles();
+        }
+
+        public void C_EditProfile(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index specified");
+            if(args.Length > 3) throw new Exception("Too many parameters");
+
+            string parameter = "";
+            string newPath = "";
+
+            Profile profile = GetProfile(args[0]);
+
+            if(args.Length >= 2) parameter = args[1];
+            if(args.Length == 3) newPath = args[2];
+
+            if(parameter == "")
+            {
+                ClearLine();
+                Console.Write("Path to edit (mods/unused/exe): ");
+                parameter = Console.ReadLine().Trim().ToLower();
+            }
+
+            string currentPath = "";
+
+            //Checks if the parameter is valid
+            if(parameter.Contains("unused")) 
+            { 
+                parameter = "unused";
+                currentPath = profile.UnusedModsPath;
+            }
+            else if(parameter.Contains("mod")) 
+            { 
+                parameter = "mod";
+                currentPath = profile.ModsPath;
+            }
+            else if(parameter.Contains("exe")) 
+            { 
+                parameter = "exe";
+                currentPath = profile.ExecutablePath;
+            }
+            else throw new Exception("Invalid parameter, must be: mods/unused/exe");
+
+            if(newPath == "")
+            {
+                ClearLine();
+                Console.WriteLine($"\nCurrent path: {currentPath}");
+                Console.Write("New path (empty to cancel): ");
+                newPath = Console.ReadLine().Trim().Replace("\"", "");
+                if(newPath == "")
+                {
+                    lastCommandOutput = "&rCancelled";
+                    return;
+                }
+            }
+            if(parameter == "exe")
+            {
+                if(!File.Exists(newPath)) throw new Exception($"File {newPath} does not exist");
+            }
+            else if(!Directory.Exists(newPath)) throw new Exception($"Directory {newPath} does not exist");
+
+            //Sets the new path
+            switch(parameter)
+            {
+                case "mod":
+                    profile.ModsPath = newPath;
+                    break;
+                case "unused":
+                    profile.UnusedModsPath = newPath;
+                    break;
+                case "exe":
+                    profile.ExecutablePath = newPath;
+                    break;
+            }
+
+            lastCommandOutput = $"&gEdited profile '{profile.Name}'";
         }
 
         public void C_EnterProfile(string[] args)
