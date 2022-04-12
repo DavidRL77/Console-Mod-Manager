@@ -16,6 +16,9 @@ namespace Console_Mod_Manager
 
         public Command(string name, string description, string usage, Action<string[]> function, params string[] aliases)
         {
+            //Name cannot be a number
+            if(int.TryParse(name, out _)) throw new ArgumentException("Name cannot be a number");
+
             Name = name;
             Description = description;
             Usage = usage;
@@ -48,6 +51,12 @@ namespace Console_Mod_Manager
         /// </summary>
         public Action<string> HelpAction { get; set; }
 
+        /// <summary>
+        /// What will be called when the command is an index
+        /// </summary>
+        /// <param name="helpAction"></param>
+        public Action<int> IndexAction { get; set; }
+
         public CommandParser(Action<string> helpAction)
         {
             commands = new List<Command>();
@@ -60,6 +69,19 @@ namespace Console_Mod_Manager
             HelpAction = helpAction;
         }
         
+        /// <summary>
+        /// Creates a new CommandParser
+        /// </summary>
+        /// <param name="helpAction"></param>
+        /// <param name="indexAction">The action that will be called when the command is a number</param>
+        /// <param name="commands"></param>
+        public CommandParser(Action<string> helpAction, Action<int> indexAction, params Command[] commands)
+        {
+            this.commands = commands.ToList();
+            IndexAction = indexAction;
+            HelpAction = helpAction;
+        }
+
         public void AddCommand(Command command)
         {
             commands.Add(command);
@@ -84,6 +106,14 @@ namespace Console_Mod_Manager
             //Separates the command from the arguments
             string[] commandSplit = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             string commandName = commandSplit[0];
+
+            //If the command is a number, then execute the index action
+            if(int.TryParse(commandName, out int index))
+            {
+                if(IndexAction != null) IndexAction(index);
+                return;
+            }
+
             string[] args = commandSplit.Skip(1).ToArray();
 
             //Finds the command

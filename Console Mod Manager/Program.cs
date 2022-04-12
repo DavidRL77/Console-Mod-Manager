@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
-using System.Threading;
 
 namespace Console_Mod_Manager
 {
@@ -16,9 +17,12 @@ namespace Console_Mod_Manager
         public string profilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\ModManager\\profiles.json";
 
         public CommandParser profileCommands;
+        public CommandParser modCommands;
+
+        private Profile currentProfile;
 
         public string lastCommandOutput = "";
-        private bool canAbort = true;
+        public FileSystemInfo[] allMods;
 
         static void Main(string[] args)
         {
@@ -29,14 +33,21 @@ namespace Console_Mod_Manager
 
         public void Init()
         {
-            profileCommands = new CommandParser(DisplayHelp,
-            new Command("create", "Creates a new profile", "create\ncreate <name>\ncreate <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
-            new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del"),
-            new Command("change", "Changes the path of a folder in a profile", "edit mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
+            profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
+            new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
+            new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
+            new Command("change", "Changes the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
             new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
-            new Command("enter", "Enters a profile", "enter <index>", C_EnterProfile, "en", "e"),
-            new Command("rename", "Renames a profile", "rename\nrename <index> <new_name>", C_RenameProfile, "re", "r")
+            new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
+            new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r")
             );
+
+            modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: ToggleMod,
+                new Command("toggle", "Toggles a mod", "toggle <index>", C_ToggleMod, "togle", "t"),
+                new Command("execute", "Executes the executable if one was provided", "execute", C_Execute, "exe", "ex"),
+                new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de", "d"),
+                new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r")
+                );
         }
 
         public void Run()
@@ -53,7 +64,7 @@ namespace Console_Mod_Manager
             do
             {
                 //Execute the start action
-                startAction();
+                if(startAction != null) startAction();
 
                 Console.ForegroundColor = ConsoleColor.Gray;
                 //Displays all the commands
@@ -99,6 +110,7 @@ namespace Console_Mod_Manager
                 try //Tries to execute the command
                 {
                     Console.WriteLine();
+                    ClearLine();
                     commandParser.TryExecute(answer);
                 }
                 catch(Exception e) //If it fails, it saves the error message in red
@@ -111,7 +123,7 @@ namespace Console_Mod_Manager
             } while(answer != "exit");
         }
 
-        #region Commands
+        #region Profile Commands
         public void C_CreateProfile(string[] args)
         {
             lastCommandOutput = "&gProfile created";
@@ -147,16 +159,12 @@ namespace Console_Mod_Manager
             Profile profile = GetProfile(args[0]);
             int index = int.Parse(args[0]);
 
-            ConsoleColor prevColor = Console.ForegroundColor;
-            Console.ForegroundColor = ConsoleColor.Cyan;
             //Asks for confirmation, if no, then cancel
             if(!YesNoAnswer($"Are you sure you want to delete '{profile.Name}'?"))
             {
                 lastCommandOutput = "&rCancelled";
-                Console.ForegroundColor = prevColor;
                 return;
             }
-            Console.ForegroundColor = prevColor;
 
             profiles.RemoveAt(index);
             lastCommandOutput = $"&gDeleted profile '{profile.Name}'";
@@ -166,7 +174,7 @@ namespace Console_Mod_Manager
         public void C_EditProfile(string[] args)
         {
             if(args.Length == 0) throw new Exception("No index specified");
-            if(args.Length > 3) throw new Exception("Too many parameters");
+            if(args.Length > 4) throw new Exception("Too many parameters");
 
             string parameter = "";
             string newPath = "";
@@ -186,18 +194,18 @@ namespace Console_Mod_Manager
             string currentPath = "";
 
             //Checks if the parameter is valid
-            if(parameter.Contains("unused")) 
-            { 
+            if(parameter.Contains("unused"))
+            {
                 parameter = "unused";
                 currentPath = profile.UnusedModsPath;
             }
-            else if(parameter.Contains("mod")) 
-            { 
+            else if(parameter.Contains("mod"))
+            {
                 parameter = "mod";
                 currentPath = profile.ModsPath;
             }
-            else if(parameter.Contains("exe")) 
-            { 
+            else if(parameter.Contains("exe"))
+            {
                 parameter = "exe";
                 currentPath = profile.ExecutablePath;
             }
@@ -236,6 +244,7 @@ namespace Console_Mod_Manager
             }
 
             lastCommandOutput = $"&gEdited profile '{profile.Name}'";
+            SaveProfiles();
         }
 
         public void C_DetailsProfile(string[] args)
@@ -244,31 +253,8 @@ namespace Console_Mod_Manager
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
             Profile profile = GetProfile(args[0]);
-            ConsoleColor prevColor = Console.ForegroundColor;
 
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"{profile.Name}:");
-
-            //Mods
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write("Mods Path: ");
-            Console.ForegroundColor = prevColor;
-            Console.WriteLine(profile.ModsPath);
-
-            //Unused mods
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write("Unused Mods Path: ");
-            Console.ForegroundColor = prevColor;
-            Console.WriteLine(profile.UnusedModsPath);
-
-            //Executable
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write("Executable Path: ");
-            Console.ForegroundColor = prevColor;
-            Console.WriteLine(profile.ExecutablePath);
-
-
-            Console.ForegroundColor = prevColor;
+            DisplayDetails(profile);
 
             Console.Write("\n\n(Enter to continue)");
             Console.ReadLine();
@@ -276,7 +262,11 @@ namespace Console_Mod_Manager
 
         public void C_EnterProfile(string[] args)
         {
-            lastCommandOutput = "&mNot implemented";
+            if(args.Length == 0) throw new Exception("No index specified");
+            if(args.Length > 1) throw new Exception("Too many arguments");
+
+            Profile profile = GetProfile(args[0]);
+            LoadProfile(profile);
         }
 
         public void C_RenameProfile(string[] args)
@@ -297,6 +287,7 @@ namespace Console_Mod_Manager
             if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
             profile.Name = name;
             lastCommandOutput = $"&gProfile renamed to '{profile.Name}'";
+            SaveProfiles();
         }
         #endregion
 
@@ -363,6 +354,34 @@ namespace Console_Mod_Manager
 
             profiles.Add(new Profile(name, modsFolder, unusedModsFolder, executablePath));
             SaveProfiles();
+        }
+
+        public void DisplayDetails(Profile profile)
+        {
+            ConsoleColor prevColor = Console.ForegroundColor;
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{profile.Name}:");
+
+            //Mods
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Mods Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.ModsPath);
+
+            //Unused mods
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Unused Mods Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.UnusedModsPath);
+
+            //Executable
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Executable Path: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.ExecutablePath);
+
+            Console.ForegroundColor = prevColor;
         }
 
         public void DisplayProfiles()
@@ -439,16 +458,295 @@ namespace Console_Mod_Manager
             ConsoleColor prevColor = Console.ForegroundColor;
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("\n" + help);
+            Console.WriteLine(help);
 
             Console.ForegroundColor = prevColor;
             Console.Write("\n(Enter to continue)");
             Console.ReadLine();
         }
 
-        public bool YesNoAnswer(string question)
+        public void EnterIndexProfile(int index)
         {
+            Profile profile = GetProfile(index);
+            LoadProfile(profile);
+        }
+
+        #region Mod Commands
+        public void C_ToggleMod(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index provided");
+            else if(args.Length > 1) throw new Exception("Too many arguments");
+
+            if(args[0] == "all") args[0] = "0-" + (allMods.Length - 1); //Replaces the keyword 'all' for a full range
+
+            if(args[0].Contains('-')) //Checks for a range
+            {
+                string[] minMax = args[0].Split('-', StringSplitOptions.TrimEntries);
+                if(minMax.Length != 2) throw new Exception("Invalid range");
+                
+                Console.WriteLine("Calculating mods to toggle...");
+                int num1 = int.Parse(minMax[0]);
+                int num2 = int.Parse(minMax[1]);
+
+                if(num1 >= allMods.Length || num2 >= allMods.Length) throw new Exception("Index out of range");
+
+                //Gets the range of mods to toggle
+                FileSystemInfo[] modsToToggle = allMods[Math.Min(num1, num2)..(Math.Max(num1, num2)+1)];
+
+                Console.Clear();
+                for(int i = 0; i < modsToToggle.Length; i++)
+                {
+                    Console.Write("\rToggling" + modsToToggle[i].Name + "...");
+                    ToggleMod(modsToToggle[i], false);
+                }
+                lastCommandOutput = "&gToggled " + modsToToggle.Length + " mods";
+            }
+            else
+            {
+                FileSystemInfo mod = GetMod(args[0]);
+                ToggleMod(mod);
+            }
+        }
+        public void C_Execute(string[] args)
+        {
+            if(currentProfile.ExecutablePath == "None")
+            {
+                lastCommandOutput = "&mNo executable provided";
+                return;
+            }
+            else
+            {
+                if(!File.Exists(currentProfile.ExecutablePath)) throw new FileNotFoundException("The executable could not be found");
+                Process.Start(currentProfile.ExecutablePath);
+                lastCommandOutput = "&gExecuted executable";
+            }
+        }
+        public void C_DeleteMod(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index provided");
+            else if(args.Length > 1) throw new Exception("Too many arguments");
+
+            FileSystemInfo mod = GetMod(args[0]);
+
+            if(!YesNoAnswer($"Delete '{mod.Name}' forever? "))
+            {
+                lastCommandOutput = $"&rCancelled";
+                return;
+            }
+
+            Console.WriteLine("Deleting mod...");
+            DeleteFileSystemInfo(mod, true);
+
+            lastCommandOutput = $"&gDeleted {mod.Name}";
+        }
+        public void C_RenameMod(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index provided");
+            else if(args.Length > 2) throw new Exception("Too many arguments");
+
+            FileSystemInfo mod = GetMod(args[0]);
+
+            string newName = "";
+            if(args.Length == 2) newName = args[1];
+            else
+            {
+                Console.Write("New name: ");
+                newName = Console.ReadLine().Trim();
+            }
+            if(string.IsNullOrEmpty(newName) || string.IsNullOrWhiteSpace(newName)) throw new Exception("Name cannot be empty");
+            if(!IsDirectory(mod.FullName)) newName += Path.GetExtension(mod.FullName);
+            if(allMods.Any(m => m.Name == newName)) throw new Exception("Name already exists");
+
+            Console.WriteLine("Renaming mod...");
+            RenameFileSystemInfo(mod, newName);
+            lastCommandOutput = $"&gRenamed {mod.Name} to {newName}";
+        }
+        #endregion
+
+        public void ToggleMod(int index)
+        {
+            FileSystemInfo mod = GetMod(index);
+            ToggleMod(mod);
+        }
+
+        public void ToggleMod(FileSystemInfo mod, bool log = true)
+        {
+            if(!mod.Exists) throw new Exception("The mod no longer exists");
+
+            bool enabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
+            string destFolder = enabled ? currentProfile.UnusedModsPath : currentProfile.ModsPath;
+
+            MoveFileSystemInfo(mod, destFolder + "\\" + mod.Name);
+
+            if(log) Console.WriteLine($"Toggling mod...");
+
+            lastCommandOutput = $"&gToggled {mod.Name}";
+        }
+
+        public void MoveFileSystemInfo(FileSystemInfo file, string destination)
+        {
+            if(IsDirectory(file.FullName))
+            {
+                Directory.Move(file.FullName, destination);
+            }
+            else
+            {
+                File.Move(file.FullName, destination);
+            }
+
+        }
+
+        public void RenameFileSystemInfo(FileSystemInfo file, string newName)
+        {
+            MoveFileSystemInfo(file, Directory.GetParent(file.FullName) + "\\" + newName);
+        }
+        public void DeleteFileSystemInfo(FileSystemInfo file, bool recursive = false)
+        {
+            if(IsDirectory(file.FullName))
+            {
+                Directory.Delete(file.FullName, recursive);
+            }
+            else
+            {
+                File.Delete(file.FullName);
+            }
+        }
+
+        public FileSystemInfo GetMod(string index)
+        {
+            int i;
+            if(int.TryParse(index, out i))
+            {
+                return GetMod(i);
+            }
+            else
+            {
+                throw new Exception("Please enter a number");
+            }
+        }
+        public FileSystemInfo GetMod(int index)
+        {
+            if(index >= profiles.Count) throw new Exception("Index out of range");
+            else if(index < 0) throw new Exception("Index must be positive");
+            return allMods[index];
+        }
+
+        public void LoadProfile(Profile profile)
+        {
+            currentProfile = profile;
+            ExecuteCommands(LoadMods, modCommands);
+        }
+
+        public void LoadMods()
+        {
+            ConsoleColor prevColor = Console.ForegroundColor;
+
+            FileSystemInfo[] mods;
+            FileSystemInfo[] unusedMods;
+
+            int duplicateIndex;
+
+            do
+            {
+                mods = new DirectoryInfo(currentProfile.ModsPath).GetFileSystemInfos();
+                unusedMods = new DirectoryInfo(currentProfile.UnusedModsPath).GetFileSystemInfos();
+                allMods = mods.Concat(unusedMods).ToArray();
+                
+                //Checks for duplicates
+                duplicateIndex = FindFirstDuplicate(mods, unusedMods);
+                if(duplicateIndex != -1)
+                {
+                    Console.Clear();
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    
+                    FileSystemInfo duplicate = unusedMods[duplicateIndex];
+                    Console.WriteLine($"Duplicate mods found. Name: {duplicate.Name}");
+                    
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                    bool rename = YesNoAnswer("\nRename unused mod? ");
+
+                    Console.ForegroundColor = prevColor;
+                    Console.WriteLine();
+                    if(rename)
+                    {
+                        C_RenameMod(new string[] { duplicateIndex.ToString()});
+                    }
+                    else
+                    {
+                        bool delete = YesNoAnswer("Delete unused mod forever? ");
+                        if(delete) DeleteFileSystemInfo(duplicate, true);
+                        else throw new Exception("Cannot have duplicate mods");
+                    }
+                    break;
+                }
+
+            }
+            while(duplicateIndex != -1);
+
+
+            Console.Clear();
+            DisplayDetails(currentProfile);
+            DisplayMods(mods);
+            
+        }
+
+        public void DisplayMods(FileSystemInfo[] usedMods)
+        {
+            ConsoleColor prevColor = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine("\nMods: ");
+            for(int i = 0; i < allMods.Length; i++)
+            {
+                FileSystemInfo mod = allMods[i];
+                bool used = usedMods.Contains(mod);
+                string check = used ? " - Enabled" : " - Disabled";
+
+                Console.ForegroundColor = ConsoleColor.White;
+                Console.Write($"{i}.- {mod.Name}");
+                Console.ForegroundColor = used ? ConsoleColor.Green : ConsoleColor.Red;
+                Console.WriteLine(check);
+                Console.ForegroundColor = prevColor;
+            }
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Will return the index of the first duplicate found, otherwise -1
+        /// </summary>
+        /// <param name="first"></param>
+        /// <param name="second"></param>
+        /// <returns></returns>
+        public int FindFirstDuplicate(FileSystemInfo[] first, FileSystemInfo[] second)
+        {
+            for(int i = 0; i < first.Length; i++)
+            {
+                string current = first[i].Name;
+                for(int j = 0; j < second.Length; j++)
+                {
+                    FileSystemInfo secondCurrent = second[j];
+                    if(secondCurrent.Name == current)
+                    {
+                        return j;
+                    }
+                }
+            }
+            return -1;
+        }
+
+        public bool IsDirectory(string path)
+        {
+            FileAttributes attr = File.GetAttributes(path);
+            return attr.HasFlag(FileAttributes.Directory);
+        }
+        public bool YesNoAnswer(string question, ConsoleColor color = ConsoleColor.Cyan)
+        {
+            ConsoleColor prevColor = Console.ForegroundColor;
+
+            Console.ForegroundColor = color;
             Console.WriteLine(question + "(y/n)");
+            Console.ForegroundColor = prevColor;
+
             ConsoleKeyInfo key;
             do
             {
@@ -456,6 +754,7 @@ namespace Console_Mod_Manager
                 if(key.KeyChar == 'y') { Console.WriteLine("y"); return true; }
                 if(key.KeyChar == 'n') { Console.WriteLine("n"); return false; }
             } while(key.Key != ConsoleKey.Escape);
+
 
             Console.WriteLine("Esc");
             throw new Exception("Cancelled");
