@@ -24,6 +24,8 @@ namespace Console_Mod_Manager
         public string lastCommandOutput = "";
         public FileSystemInfo[] allMods;
 
+        private string currentFilter = "";
+
         static void Main(string[] args)
         {
             Program p = new Program();
@@ -33,20 +35,24 @@ namespace Console_Mod_Manager
 
         public void Init()
         {
+            Command filterCommand = new Command("filter", "Filters the items that are displayed. Empty to clear filter.", "filter <filter>", C_Filter, "f", "search");
+
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
             new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
             new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
             new Command("change", "Changes the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
             new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
             new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
-            new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r")
+            new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
+            filterCommand
             );
 
             modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: ToggleMod,
                 new Command("toggle", "Toggles a mod", "toggle <index>", C_ToggleMod, "togle", "t"),
                 new Command("execute", "Executes the executable if one was provided", "execute", C_Execute, "exe", "ex"),
                 new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de", "d"),
-                new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r")
+                new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r"),
+                filterCommand
                 );
         }
 
@@ -121,6 +127,15 @@ namespace Console_Mod_Manager
                 Console.Clear();
 
             } while(answer != "exit");
+        }
+
+        public void C_Filter(string[] args)
+        {
+            if(args.Length == 0) currentFilter = "";
+            else currentFilter = string.Join(' ',args).Trim();
+
+            if(currentFilter == "") lastCommandOutput = "&gRemoved filter";
+            else lastCommandOutput = $"&gApplied filter '{currentFilter}'";
         }
 
         #region Profile Commands
@@ -388,6 +403,12 @@ namespace Console_Mod_Manager
         {
             ConsoleColor prevColor = Console.ForegroundColor;
 
+
+            //Shows the current filter
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            if(currentFilter != "") Console.WriteLine($"Filter: {currentFilter}");
+            Console.ForegroundColor = prevColor;
+
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Profiles:");
 
@@ -400,6 +421,10 @@ namespace Console_Mod_Manager
 
             for(int i = 0; i < profiles.Count; i++)
             {
+                //The string that will be checked against the filter
+                string filterString = profiles[i].Name;
+                if(!PassesFilter(filterString, currentFilter)) continue;
+
                 Console.WriteLine($"{i}.- {profiles[i].Name}");
             }
 
@@ -483,7 +508,7 @@ namespace Console_Mod_Manager
             {
                 string[] minMax = args[0].Split('-', StringSplitOptions.TrimEntries);
                 if(minMax.Length != 2) throw new Exception("Invalid range");
-                
+
                 Console.WriteLine("Calculating mods to toggle...");
                 int num1 = int.Parse(minMax[0]);
                 int num2 = int.Parse(minMax[1]);
@@ -491,7 +516,7 @@ namespace Console_Mod_Manager
                 if(num1 >= allMods.Length || num2 >= allMods.Length) throw new Exception("Index out of range");
 
                 //Gets the range of mods to toggle
-                FileSystemInfo[] modsToToggle = allMods[Math.Min(num1, num2)..(Math.Max(num1, num2)+1)];
+                FileSystemInfo[] modsToToggle = allMods[Math.Min(num1, num2)..(Math.Max(num1, num2) + 1)];
 
                 Console.Clear();
                 for(int i = 0; i < modsToToggle.Length; i++)
@@ -651,17 +676,17 @@ namespace Console_Mod_Manager
                 mods = new DirectoryInfo(currentProfile.ModsPath).GetFileSystemInfos();
                 unusedMods = new DirectoryInfo(currentProfile.UnusedModsPath).GetFileSystemInfos();
                 allMods = mods.Concat(unusedMods).ToArray();
-                
+
                 //Checks for duplicates
                 duplicateIndex = FindFirstDuplicate(mods, unusedMods);
                 if(duplicateIndex != -1)
                 {
                     Console.Clear();
                     Console.ForegroundColor = ConsoleColor.Red;
-                    
+
                     FileSystemInfo duplicate = unusedMods[duplicateIndex];
                     Console.WriteLine($"Duplicate mods found. Name: {duplicate.Name}");
-                    
+
                     Console.ForegroundColor = ConsoleColor.Gray;
                     bool rename = YesNoAnswer("\nRename unused mod? ");
 
@@ -669,7 +694,7 @@ namespace Console_Mod_Manager
                     Console.WriteLine();
                     if(rename)
                     {
-                        C_RenameMod(new string[] { duplicateIndex.ToString()});
+                        C_RenameMod(new string[] { duplicateIndex.ToString() });
                     }
                     else
                     {
@@ -687,19 +712,31 @@ namespace Console_Mod_Manager
             Console.Clear();
             DisplayDetails(currentProfile);
             DisplayMods(mods);
-            
+
         }
 
         public void DisplayMods(FileSystemInfo[] usedMods)
         {
             ConsoleColor prevColor = Console.ForegroundColor;
+
+            Console.WriteLine();
+
+            //Shows the current filter
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            if(currentFilter != "") Console.WriteLine($"Filter: {currentFilter}");
+            Console.ForegroundColor = prevColor;
+
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("\nMods: ");
+            Console.WriteLine("Mods: ");
             for(int i = 0; i < allMods.Length; i++)
             {
                 FileSystemInfo mod = allMods[i];
                 bool used = usedMods.Contains(mod);
                 string check = used ? " - Enabled" : " - Disabled";
+
+                //The string that will be checked against the filter
+                string filterString = $"{mod.Name}{check}";
+                if(!PassesFilter(filterString, currentFilter)) continue;
 
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.Write($"{i}.- {mod.Name}");
@@ -732,6 +769,12 @@ namespace Console_Mod_Manager
                 }
             }
             return -1;
+        }
+
+        public bool PassesFilter(string stringToCheck, string filter)
+        {
+            if(filter == "") return true;
+            return stringToCheck.ToLower().Contains(filter);
         }
 
         public bool IsDirectory(string path)
