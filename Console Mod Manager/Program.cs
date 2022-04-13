@@ -40,7 +40,7 @@ namespace Console_Mod_Manager
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
             new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
             new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
-            new Command("change", "Changes the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "edit", "ch", "ed"),
+            new Command("edit", "Edits the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "change", "ch", "ed"),
             new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
             new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
             new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
@@ -49,9 +49,9 @@ namespace Console_Mod_Manager
 
             modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: ToggleMod,
                 new Command("toggle", "Toggles a mod", "toggle <index>", C_ToggleMod, "togle", "t"),
-                new Command("execute", "Executes the executable if one was provided", "execute", C_Execute, "exe", "ex"),
                 new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de", "d"),
                 new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r"),
+                new Command("open", "Opens the directory of a mod or profile folder", "open mod/unused/exe/<index>", C_Open, "op", "go"),
                 filterCommand
                 );
         }
@@ -132,7 +132,7 @@ namespace Console_Mod_Manager
         public void C_Filter(string[] args)
         {
             if(args.Length == 0) currentFilter = "";
-            else currentFilter = string.Join(' ',args).Trim();
+            else currentFilter = string.Join(' ', args).Trim();
 
             if(currentFilter == "") lastCommandOutput = "&gRemoved filter";
             else lastCommandOutput = $"&gApplied filter '{currentFilter}'";
@@ -532,19 +532,49 @@ namespace Console_Mod_Manager
                 ToggleMod(mod);
             }
         }
-        public void C_Execute(string[] args)
+        public void C_Open(string[] args)
         {
-            if(currentProfile.ExecutablePath == "None")
+            if(args.Length == 0) throw new Exception("No index provided");
+            else if(args.Length > 1) throw new Exception("Too many arguments");
+
+            string arg = args[0];
+            int index;
+            string path;
+            bool folder = false;
+            if(arg.Contains("exe"))
             {
-                lastCommandOutput = "&mNo executable provided";
-                return;
+                path = currentProfile.ExecutablePath;
+                if(path == "None")
+                {
+                    lastCommandOutput = "&mNo executable path set";
+                    return;
+                }
+            }
+            else if(arg.Contains("unused"))
+            {
+                path = currentProfile.UnusedModsPath;
+                folder = true;
+            }
+            else if(arg.Contains("mod"))
+            {
+                path = currentProfile.ModsPath;
+                folder = true;
             }
             else
             {
-                if(!File.Exists(currentProfile.ExecutablePath)) throw new FileNotFoundException("The executable could not be found");
-                Process.Start(currentProfile.ExecutablePath);
-                lastCommandOutput = "&gExecuted executable";
+                FileSystemInfo mod = GetMod(arg);
+                path = mod.FullName;
             }
+
+            if(!Directory.Exists(path) && !File.Exists(path)) throw new Exception("That directory or file no longer exists");
+
+            string argument = folder ? path : "/select, \"" + path + "\"";
+            Process.Start("explorer.exe", argument);
+
+            if(path == currentProfile.ExecutablePath) lastCommandOutput = "&gOpened the executable path";
+            else if(path == currentProfile.ModsPath) lastCommandOutput = "&gOpened the mods folder";
+            else if(path == currentProfile.UnusedModsPath) lastCommandOutput = "&gOpened the unused mods folder";
+            else lastCommandOutput =  $"&gOpened '{Path.GetFileName(path)}' location";
         }
         public void C_DeleteMod(string[] args)
         {
@@ -651,7 +681,7 @@ namespace Console_Mod_Manager
         }
         public FileSystemInfo GetMod(int index)
         {
-            if(index >= profiles.Count) throw new Exception("Index out of range");
+            if(index >= allMods.Length) throw new Exception("Index out of range");
             else if(index < 0) throw new Exception("Index must be positive");
             return allMods[index];
         }
