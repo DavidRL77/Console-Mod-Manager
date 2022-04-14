@@ -124,7 +124,6 @@ namespace Console_Mod_Manager
             for(int i = 0; i < args.Length; i++)
             {
                 string arg = args[i];
-                if(arg.StartsWith('-') || arg.StartsWith('-')) arg = arg[1..];
                 arg = arg.Trim().Replace("\"", "");
                 args[i] = arg;
             }

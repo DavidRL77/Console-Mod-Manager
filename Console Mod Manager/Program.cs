@@ -38,14 +38,14 @@ namespace Console_Mod_Manager
             Command filterCommand = new Command("filter", "Filters the items that are displayed. Empty to clear filter.", "filter <filter>", C_Filter, "f", "search");
 
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
-            new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
-            new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
-            new Command("edit", "Edits the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "change", "ch", "ed"),
-            new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
-            new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
-            new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
-            filterCommand
-            );
+                new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
+                new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
+                new Command("edit", "Edits the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "change", "ch", "ed"),
+                new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
+                new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
+                new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
+                filterCommand
+                );
 
             modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: ToggleMod,
                 new Command("toggle", "Toggles a mod", "toggle <index>", C_ToggleMod, "togle", "t"),
@@ -410,7 +410,7 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = prevColor;
 
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Profiles:");
+            Console.WriteLine($"Profiles:");
 
             if(profiles.Count == 0)
             {
@@ -574,7 +574,7 @@ namespace Console_Mod_Manager
             if(path == currentProfile.ExecutablePath) lastCommandOutput = "&gOpened the executable path";
             else if(path == currentProfile.ModsPath) lastCommandOutput = "&gOpened the mods folder";
             else if(path == currentProfile.UnusedModsPath) lastCommandOutput = "&gOpened the unused mods folder";
-            else lastCommandOutput =  $"&gOpened '{Path.GetFileName(path)}' location";
+            else lastCommandOutput = $"&gOpened '{Path.GetFileName(path)}' location";
         }
         public void C_DeleteMod(string[] args)
         {
@@ -757,7 +757,7 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = prevColor;
 
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Mods: ");
+            Console.WriteLine("Mods:");
             for(int i = 0; i < allMods.Length; i++)
             {
                 FileSystemInfo mod = allMods[i];
@@ -804,6 +804,8 @@ namespace Console_Mod_Manager
         public bool PassesFilter(string stringToCheck, string filter)
         {
             if(filter == "") return true;
+
+            if(filter.StartsWith('-')) return !stringToCheck.ToLower().Contains(filter[1..]);
             return stringToCheck.ToLower().Contains(filter);
         }
 
