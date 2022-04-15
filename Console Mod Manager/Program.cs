@@ -60,7 +60,7 @@ namespace Console_Mod_Manager
         {
             LoadProfiles();
             Console.WriteLine();
-            ExecuteCommands(DisplayProfiles, profileCommands);
+            ExecuteCommands(startAction: DisplayProfiles, profileCommands);
         }
 
         //Will execute commands on a loop until the user exits
@@ -534,7 +534,7 @@ namespace Console_Mod_Manager
         }
         public void C_Open(string[] args)
         {
-            if(args.Length == 0) throw new Exception("No index provided");
+            if(args.Length == 0) throw new Exception("No index or options provided");
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
             string arg = args[0];
@@ -690,11 +690,12 @@ namespace Console_Mod_Manager
         public void LoadProfile(Profile profile)
         {
             currentProfile = profile;
-            ExecuteCommands(LoadMods, modCommands);
+            ExecuteCommands(startAction: LoadMods, modCommands);
         }
 
         public void LoadMods()
         {
+            Console.Write("Loading mods...");
             ConsoleColor prevColor = Console.ForegroundColor;
 
             FileSystemInfo[] mods;
@@ -811,21 +812,65 @@ namespace Console_Mod_Manager
 
             string[] filterSplit = filter.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-            for(int i = 0; i < filterSplit.Length; i++)
+
+            if(!filterSplit.Contains("||")) //No logical operators used
             {
-                string current = filterSplit[i];
-
-                if(current.StartsWith('-'))
+                //The fast check, returns as soon as a word evaluates false
+                for(int i = 0; i < filterSplit.Length; i++)
                 {
-                    if(stringToCheck.Contains(current[1..])) return false;
-                }
-                else
-                {
-                    if(!stringToCheck.Contains(current)) return false;
-                }
+                    string current = filterSplit[i];
 
+                    if(current.StartsWith('-'))
+                    {
+                        if(stringToCheck.Contains(current[1..])) return false;
+                    }
+                    else
+                    {
+                        if(!stringToCheck.Contains(current)) return false;
+                    }
+
+                }
+                return true;
             }
-            return true;
+            else
+            {
+                bool orOperator = false;
+                bool passed = false;
+
+                //The bool operator check
+                for(int i = 0; i < filterSplit.Length; i++)
+                {
+                    string current = filterSplit[i];
+
+                    if(current == "||")
+                    {
+                        orOperator = true;
+                        continue;
+                    }
+
+                    //If the first result in the 'or' operation was true, no need to check the rest
+                    if(orOperator && passed) {orOperator = false; continue; }
+                    if(current.StartsWith('-'))
+                    {
+                        if(stringToCheck.Contains(current[1..])) passed = false;
+                        else passed = true;
+                    }
+                    else
+                    {
+                        if(!stringToCheck.Contains(current)) passed = false;
+                        else passed = true;
+                    }
+
+                    //Returns false when:
+                    //It is the last word in an 'or' operation and it didn't pass
+                    //It isn't an 'or' operation and it didn't pass
+                    //Always check at least the first two words before returning false
+                    if(!passed && i > 0) return false;
+
+                    orOperator = false;
+                }
+                return true;
+            }
         }
 
         public bool IsDirectory(string path)
