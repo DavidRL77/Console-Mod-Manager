@@ -35,7 +35,7 @@ namespace Console_Mod_Manager
 
         public void Init()
         {
-            Command filterCommand = new Command("filter", "Filters the items that are displayed. Empty to clear filter.", "filter <filter>", C_Filter, "f", "search");
+            Command filterCommand = new Command("filter", "Filters the items that are displayed. Empty to clear filter.", "filter <filter>\nEach word will be evaluated separately. The filter evaluates wether the name contains that word, or the opposite in the case of '-' in front.\n\nExample:\nfilter banana -apple\nOnly the names containing banana, and not containing apple will be shown.", C_Filter, "f", "search");
 
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
                 new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
@@ -162,7 +162,7 @@ namespace Console_Mod_Manager
                 default:
                     lastCommandOutput = "";
                     throw new Exception("Too many arguments");
-                    break;
+                   
             }
         }
 
@@ -635,7 +635,8 @@ namespace Console_Mod_Manager
 
             if(log) Console.WriteLine($"Toggling mod...");
 
-            lastCommandOutput = $"&gToggled {mod.Name}";
+            string action = enabled ? "Disabled" : "Enabled";
+            lastCommandOutput = $"&g{action} {mod.Name}";
         }
 
         public void MoveFileSystemInfo(FileSystemInfo file, string destination)
@@ -805,8 +806,26 @@ namespace Console_Mod_Manager
         {
             if(filter == "") return true;
 
-            if(filter.StartsWith('-')) return !stringToCheck.ToLower().Contains(filter[1..]);
-            return stringToCheck.ToLower().Contains(filter);
+            stringToCheck = stringToCheck.ToLower();
+            filter = filter.ToLower();
+
+            string[] filterSplit = filter.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            for(int i = 0; i < filterSplit.Length; i++)
+            {
+                string current = filterSplit[i];
+
+                if(current.StartsWith('-'))
+                {
+                    if(stringToCheck.Contains(current[1..])) return false;
+                }
+                else
+                {
+                    if(!stringToCheck.Contains(current)) return false;
+                }
+
+            }
+            return true;
         }
 
         public bool IsDirectory(string path)
