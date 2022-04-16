@@ -896,7 +896,7 @@ namespace Console_Mod_Manager
 
 
             Console.WriteLine("Esc");
-            throw new Exception("Cancelled");
+            throw new Exception("Aborted");
         }
     }
 }

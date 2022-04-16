@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <Content Include="bin\Debug\net5.0\Mod Manager Icon.ico" />
-    <Content Include="images\Mod Manager Icon.ico" />
   </ItemGroup>
 
 </Project>
