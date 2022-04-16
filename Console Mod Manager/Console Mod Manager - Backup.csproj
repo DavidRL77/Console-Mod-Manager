@@ -4,12 +4,11 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net5.0</TargetFramework>
     <RootNamespace>Console_Mod_Manager</RootNamespace>
-    <ApplicationIcon>images\Mod Manager Icon.ico</ApplicationIcon>
+    <ApplicationIcon>bin\Debug\net5.0\Mod Manager Icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <Content Include="bin\Debug\net5.0\Mod Manager Icon.ico" />
-    <Content Include="images\Mod Manager Icon.ico" />
   </ItemGroup>
 
 </Project>
