@@ -812,7 +812,6 @@ namespace Console_Mod_Manager
 
             string[] filterSplit = filter.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
-
             if(!filterSplit.Contains("||")) //No logical operators used
             {
                 //The fast check, returns as soon as a word evaluates false
@@ -820,7 +819,7 @@ namespace Console_Mod_Manager
                 {
                     string current = filterSplit[i];
 
-                    if(current.StartsWith('-'))
+                    if(current.StartsWith('-') && current.Length > 1) //If the filter starts with a '-' and it has something after it
                     {
                         if(stringToCheck.Contains(current[1..])) return false;
                     }
@@ -850,7 +849,7 @@ namespace Console_Mod_Manager
 
                     //If the first result in the 'or' operation was true, no need to check the rest
                     if(orOperator && passed) {orOperator = false; continue; }
-                    if(current.StartsWith('-'))
+                    if(current.StartsWith('-') && current.Length > 1) //If the filter starts with a '-' and it has something after it
                     {
                         if(stringToCheck.Contains(current[1..])) passed = false;
                         else passed = true;
