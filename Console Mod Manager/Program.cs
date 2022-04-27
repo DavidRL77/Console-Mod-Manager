@@ -23,6 +23,7 @@ namespace Console_Mod_Manager
 
         public string lastCommandOutput = "";
         public FileSystemInfo[] allMods;
+        public List<FileSystemInfo> filteredMods;
 
         private string currentFilter = "";
 
@@ -35,6 +36,7 @@ namespace Console_Mod_Manager
 
         public void Init()
         {
+            filteredMods = new List<FileSystemInfo>();
             Command filterCommand = new Command("filter", "Filters the items that are displayed. Empty to clear filter.", "filter <filter>\nEach word will be evaluated separately. The filter evaluates wether the name contains that word, or the opposite in the case of '-' in front.\n\nExample:\nfilter banana -apple\nOnly the names containing banana, and not containing apple will be shown.", C_Filter, "f", "search");
 
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
@@ -504,33 +506,55 @@ namespace Console_Mod_Manager
 
             if(args[0] == "all") args[0] = "0-" + (allMods.Length - 1); //Replaces the keyword 'all' for a full range
 
-            if(args[0].Contains('-')) //Checks for a range
+            string[] indexes = args[0].Split(',', StringSplitOptions.TrimEntries);
+
+            List<FileSystemInfo> toggledMods = new List<FileSystemInfo>();
+
+            //Goes through all the indexes separated by commas, and adds the mods to be toggled.
+            //If the user does something like: 1,2,6-8,10
+            //It'll go through each index/range adding all the mods 
+            if(indexes.Length > 1) Console.WriteLine("Calculating mods to toggle...");
+            for(int i = 0; i < indexes.Length; i++) 
             {
-                string[] minMax = args[0].Split('-', StringSplitOptions.TrimEntries);
-                if(minMax.Length != 2) throw new Exception("Invalid range");
-
-                Console.WriteLine("Calculating mods to toggle...");
-                int num1 = int.Parse(minMax[0]);
-                int num2 = int.Parse(minMax[1]);
-
-                if(num1 >= allMods.Length || num2 >= allMods.Length) throw new Exception("Index out of range");
-
-                //Gets the range of mods to toggle
-                FileSystemInfo[] modsToToggle = allMods[Math.Min(num1, num2)..(Math.Max(num1, num2) + 1)];
-
-                Console.Clear();
-                for(int i = 0; i < modsToToggle.Length; i++)
+                string currentIndex = indexes[i];
+                if(currentIndex.Contains('-')) //Checks for a range
                 {
-                    Console.Write("\rToggling" + modsToToggle[i].Name + "...");
-                    ToggleMod(modsToToggle[i], false);
+                    string[] minMax = currentIndex.Split('-', StringSplitOptions.TrimEntries);
+                    if(minMax.Length != 2) throw new Exception("Invalid range");
+
+                    int num1 = int.Parse(minMax[0]);
+                    int num2 = int.Parse(minMax[1]);
+
+                    if(num1 >= allMods.Length || num2 >= allMods.Length) throw new Exception("Index out of range");
+
+                    //Gets the range of mods to toggle
+                    FileSystemInfo[] modsToToggle = allMods[Math.Min(num1, num2)..(Math.Max(num1, num2) + 1)];
+
+                    Console.Clear();
+                    for(int j = 0; j < modsToToggle.Length; j++)
+                    {
+                        toggledMods.Add(modsToToggle[j]);
+                    }
                 }
-                lastCommandOutput = "&gToggled " + modsToToggle.Length + " mods";
+                else
+                {
+                    FileSystemInfo mod = GetMod(currentIndex);
+                    toggledMods.Add(mod);
+                }
             }
-            else
+
+            Console.Clear();
+
+            //Toggles all the mods specified
+            for(int i = 0; i < toggledMods.Count; i++)
             {
-                FileSystemInfo mod = GetMod(args[0]);
+                FileSystemInfo mod = toggledMods[i];
+                Console.WriteLine($"Toggling {mod.Name}...");
                 ToggleMod(mod);
             }
+
+            lastCommandOutput = toggledMods.Count == 1 ? $"&gToggled {toggledMods[0].Name}" : $"&gToggled {toggledMods.Count} mods";
+            
         }
         public void C_Open(string[] args)
         {
@@ -758,6 +782,7 @@ namespace Console_Mod_Manager
             if(currentFilter != "") Console.WriteLine($"Filter: {currentFilter}");
             Console.ForegroundColor = prevColor;
 
+            filteredMods.Clear();
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Mods:");
             for(int i = 0; i < allMods.Length; i++)
@@ -770,6 +795,7 @@ namespace Console_Mod_Manager
                 string filterString = $"{mod.Name}{check}";
                 if(!PassesFilter(filterString, currentFilter)) continue;
 
+                filteredMods.Add(mod);
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.Write($"{i}.- {mod.Name}");
                 Console.ForegroundColor = used ? ConsoleColor.Green : ConsoleColor.Red;
