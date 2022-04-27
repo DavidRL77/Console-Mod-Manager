@@ -504,7 +504,6 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index provided");
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
-            if(args[0] == "all") args[0] = "0-" + (allMods.Length - 1); //Replaces the keyword 'all' for a full range
 
             string[] indexes = args[0].Split(',', StringSplitOptions.TrimEntries);
 
@@ -535,6 +534,11 @@ namespace Console_Mod_Manager
                     {
                         toggledMods.Add(modsToToggle[j]);
                     }
+                }
+                else if(currentIndex == "all")
+                {
+                    if(currentFilter != "") toggledMods.AddRange(filteredMods);
+                    else toggledMods.AddRange(allMods);
                 }
                 else
                 {
@@ -793,9 +797,9 @@ namespace Console_Mod_Manager
 
                 //The string that will be checked against the filter
                 string filterString = $"{mod.Name}{check}";
-                if(!PassesFilter(filterString, currentFilter)) continue;
+                if(currentFilter != "" && !PassesFilter(filterString, currentFilter)) continue;
 
-                filteredMods.Add(mod);
+                if(currentFilter != "") filteredMods.Add(mod);
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.Write($"{i}.- {mod.Name}");
                 Console.ForegroundColor = used ? ConsoleColor.Green : ConsoleColor.Red;
