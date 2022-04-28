@@ -49,9 +49,11 @@ namespace Console_Mod_Manager
                 filterCommand
                 );
 
-            modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: ToggleMod,
+            modCommands = new CommandParser(helpAction: DisplayHelp, indexAction: AutoToggleMod,
                 new Command("toggle", "Toggles a mod", "toggle <index>", C_ToggleMod, "togle", "t"),
-                new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de", "d"),
+                new Command("enable", "Enables a mod", "enable <index>", C_EnableMod, "e", "en"),
+                new Command("disable", "Disables a mod", "disable <index>", C_DisableMod, "dis", "d"),
+                new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de"),
                 new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r"),
                 new Command("open", "Opens the directory of a mod or profile folder", "open mod/unused/exe/<index>", C_Open, "op", "go"),
                 filterCommand
@@ -501,8 +503,24 @@ namespace Console_Mod_Manager
         #region Mod Commands
         public void C_ToggleMod(string[] args)
         {
+
             if(args.Length == 0) throw new Exception("No index provided");
-            else if(args.Length > 1) throw new Exception("Too many arguments");
+
+            //Modes: 0 = toggle; 1 = enable; 2 = disable
+            int mode = 0;
+
+            //If the first argument is either 'e' or 'd', it means a change in mode
+            if(args[0] == "e") mode = 1;
+            else if(args[0] == "d") mode = 2;
+
+            //Means the mode was changed
+            if(mode != 0)
+            {
+                if(args.Length == 1) throw new Exception("No index provided");
+                args = new string[] { args[1] };
+            }
+
+            if(args.Length > 1) throw new Exception("Too many arguments");
 
 
             string[] indexes = args[0].Split(',', StringSplitOptions.TrimEntries);
@@ -549,17 +567,61 @@ namespace Console_Mod_Manager
 
             Console.Clear();
 
+            string action = "Toggl";
+            if(mode == 1) action = "Enabl";
+            else if(mode == 2) action = "Disabl";
+
+            int toggled = 0;
             //Toggles all the mods specified
             for(int i = 0; i < toggledMods.Count; i++)
             {
                 FileSystemInfo mod = toggledMods[i];
-                Console.WriteLine($"Toggling {mod.Name}...");
-                ToggleMod(mod);
-            }
+                Console.WriteLine($"{action}ing {mod.Name}...");
 
-            lastCommandOutput = toggledMods.Count == 1 ? $"&gToggled {toggledMods[0].Name}" : $"&gToggled {toggledMods.Count} mods";
+                bool isEnabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
+                if(mode == 1 && isEnabled) continue;
+                else if(mode == 2 && !isEnabled) continue;
+
+                //Decides wether to enable or disable the mod
+                bool enable;
+                switch(mode)
+                {
+                    case 0: //Toggle
+                        enable = !isEnabled;
+                        break;
+                    case 1: //Enable
+                        enable = true;
+                        break;
+
+                    case 2: //Disable
+                        enable = false;
+                        break;
+                    default:
+                        throw new Exception("INVALID MODE WTF DID YOU DO");
+                }
+
+                ToggleMod(mod, enable);
+                toggled++;
+            }
+;
+            lastCommandOutput = toggled == 1 ? $"&g{action}ed {toggledMods[0].Name}" : $"&g{action}ed {toggled} mods";
             
         }
+        public void C_EnableMod(string[] args) 
+        {
+            string[] modifier = { "e" };
+
+            //Adds 'e' as the first arg, because it means enable
+            C_ToggleMod(modifier.Concat(args).ToArray());
+        }
+        public void C_DisableMod(string[] args) 
+        {
+            string[] modifier = { "d" };
+
+            //Adds 'd' as the first arg, because it means disable
+            C_ToggleMod(modifier.Concat(args).ToArray());
+        }
+
         public void C_Open(string[] args)
         {
             if(args.Length == 0) throw new Exception("No index or options provided");
@@ -646,25 +708,34 @@ namespace Console_Mod_Manager
         }
         #endregion
 
-        public void ToggleMod(int index)
+        public void AutoToggleMod(int index)
         {
             FileSystemInfo mod = GetMod(index);
-            ToggleMod(mod);
+            bool enable = Directory.GetParent(mod.FullName).Equals(currentProfile.UnusedModsPath);
+            ToggleMod(mod, enable);
         }
 
-        public void ToggleMod(FileSystemInfo mod, bool log = true)
+        public void ToggleMod(int index, bool enable, bool log = true)
+        {
+            FileSystemInfo mod = GetMod(index);
+            ToggleMod(mod, enable, log);
+        }
+
+        public void ToggleMod(FileSystemInfo mod, bool enable, bool log = true)
         {
             if(!mod.Exists) throw new Exception("The mod no longer exists");
 
-            bool enabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
-            string destFolder = enabled ? currentProfile.UnusedModsPath : currentProfile.ModsPath;
+            //bool enabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
+
+            string destFolder = enable ? currentProfile.ModsPath : currentProfile.UnusedModsPath;
+            if(destFolder == Directory.GetParent(mod.FullName).FullName) return;
 
             MoveFileSystemInfo(mod, destFolder + "\\" + mod.Name);
 
-            if(log) Console.WriteLine($"Toggling mod...");
+            string action = enable ? "Disabl" : "Enabl";
+            if(log) Console.WriteLine($"{action}ing mod...");
 
-            string action = enabled ? "Disabled" : "Enabled";
-            lastCommandOutput = $"&g{action} {mod.Name}";
+            lastCommandOutput = $"&g{action}ed {mod.Name}";
         }
 
         public void MoveFileSystemInfo(FileSystemInfo file, string destination)
