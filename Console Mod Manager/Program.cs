@@ -732,7 +732,7 @@ namespace Console_Mod_Manager
 
             MoveFileSystemInfo(mod, destFolder + "\\" + mod.Name);
 
-            string action = enable ? "Disabl" : "Enabl";
+            string action = enable ? "Enabl" : "Disabl";
             if(log) Console.WriteLine($"{action}ing mod...");
 
             lastCommandOutput = $"&g{action}ed {mod.Name}";
