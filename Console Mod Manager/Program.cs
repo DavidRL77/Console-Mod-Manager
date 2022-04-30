@@ -711,7 +711,7 @@ namespace Console_Mod_Manager
         public void AutoToggleMod(int index)
         {
             FileSystemInfo mod = GetMod(index);
-            bool enable = Directory.GetParent(mod.FullName).Equals(currentProfile.UnusedModsPath);
+            bool enable = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.UnusedModsPath);
             ToggleMod(mod, enable);
         }
 
@@ -728,11 +728,16 @@ namespace Console_Mod_Manager
             //bool enabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
 
             string destFolder = enable ? currentProfile.ModsPath : currentProfile.UnusedModsPath;
-            if(destFolder == Directory.GetParent(mod.FullName).FullName) return;
+            string action = enable ? "Enabl" : "Disabl";
+
+            if(destFolder == Directory.GetParent(mod.FullName).FullName)
+            {
+                lastCommandOutput = $"&r{mod.Name} already {action.ToLower()}ed";
+                return;
+            }
 
             MoveFileSystemInfo(mod, destFolder + "\\" + mod.Name);
 
-            string action = enable ? "Enabl" : "Disabl";
             if(log) Console.WriteLine($"{action}ing mod...");
 
             lastCommandOutput = $"&g{action}ed {mod.Name}";
