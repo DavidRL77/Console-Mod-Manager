@@ -26,6 +26,9 @@ namespace Console_Mod_Manager
         public List<FileSystemInfo> filteredMods;
 
         private string currentFilter = "";
+        public MenuType currentMenu;
+
+        public enum MenuType { Profiles, Mods };
 
         static void Main(string[] args)
         {
@@ -65,17 +68,17 @@ namespace Console_Mod_Manager
         {
             LoadProfiles();
             Console.WriteLine();
-            ExecuteCommands(startAction: DisplayProfiles, profileCommands);
+            ExecuteCommands(startAction: DisplayProfiles, errorAction: HandleCommandError, profileCommands);
         }
 
         //Will execute commands on a loop until the user exits
-        public void ExecuteCommands(Action startAction, CommandParser commandParser)
+        public void ExecuteCommands(Action startAction, Action<string, Exception> errorAction, CommandParser commandParser)
         {
             string answer;
             do
             {
                 //Execute the start action
-                if(startAction != null) startAction();
+                startAction?.Invoke();
 
                 Console.ForegroundColor = ConsoleColor.Gray;
                 //Displays all the commands
@@ -126,12 +129,30 @@ namespace Console_Mod_Manager
                 }
                 catch(Exception e) //If it fails, it saves the error message in red
                 {
-                    lastCommandOutput = "&rError: " + e.Message;
+                    errorAction?.Invoke(answer, e);
+                    //lastCommandOutput = "&rError: " + e.Message;
                 }
 
                 Console.Clear();
 
             } while(answer != "exit");
+        }
+
+        public void HandleCommandError(string command, Exception e)
+        {
+            if(e.GetType() == typeof(InvalidCommandException))
+            {
+                try
+                {
+                    if(currentMenu == MenuType.Profiles) profileCommands.IndexAction(GetProfileIndex(command));
+                    else if(currentMenu == MenuType.Mods) modCommands.IndexAction(GetModIndex(command));
+                }
+                catch
+                {
+                    lastCommandOutput = "&rError: " + e.Message;
+                }
+            }
+
         }
 
         public void C_Filter(string[] args)
@@ -313,21 +334,35 @@ namespace Console_Mod_Manager
 
         public Profile GetProfile(string index)
         {
-            int i;
-            if(int.TryParse(index, out i))
-            {
-                return GetProfile(i);
-            }
-            else
-            {
-                throw new Exception("Please enter a number");
-            }
+            int i = GetProfileIndex(index);
+            return GetProfile(i);
         }
         public Profile GetProfile(int index)
         {
             if(index >= profiles.Count) throw new Exception("Index out of range");
             else if(index < 0) throw new Exception("Index must be positive");
             return profiles[index];
+        }
+
+        public int GetProfileIndex(string index)
+        {
+            int i;
+            if(int.TryParse(index, out i))
+            {
+                return i;
+            }
+            else
+            {
+                for(int j = 0; j < profiles.Count; j++)
+                {
+                    if(profiles[j].Name.Equals(index, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return j;
+                    }
+                }
+
+                throw new Exception("Please enter a number or full name of profile");
+            }
         }
 
         public void CreateProfile(string name = "", string modsFolder = "", string unusedModsFolder = "", string executablePath = "")
@@ -412,6 +447,7 @@ namespace Console_Mod_Manager
 
         public void DisplayProfiles()
         {
+            currentMenu = MenuType.Profiles;
             ConsoleColor prevColor = Console.ForegroundColor;
 
 
@@ -852,15 +888,8 @@ namespace Console_Mod_Manager
 
         public FileSystemInfo GetMod(string index)
         {
-            int i;
-            if(int.TryParse(index, out i))
-            {
-                return GetMod(i);
-            }
-            else
-            {
-                throw new Exception("Please enter a number");
-            }
+            int i = GetModIndex(index);
+            return GetMod(i);
         }
         public FileSystemInfo GetMod(int index)
         {
@@ -869,14 +898,36 @@ namespace Console_Mod_Manager
             return allMods[index];
         }
 
+        public int GetModIndex(string index)
+        {
+            int i;
+            if(int.TryParse(index, out i))
+            {
+                return i;
+            }
+            else
+            {
+                for(int j = 0; j < allMods.Length; j++)
+                {
+                    if(allMods[j].Name.Equals(index, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return j;
+                    }
+                }
+
+                throw new Exception("Please enter a number or full name of mod");
+            }
+        }
+
         public void LoadProfile(Profile profile)
         {
             currentProfile = profile;
-            ExecuteCommands(startAction: LoadMods, modCommands);
+            ExecuteCommands(startAction: LoadMods, errorAction: HandleCommandError, modCommands);
         }
 
         public void LoadMods()
         {
+            currentMenu = MenuType.Mods;
             Console.Write("Loading mods...");
             ConsoleColor prevColor = Console.ForegroundColor;
 

@@ -118,7 +118,7 @@ namespace Console_Mod_Manager
 
             //Finds the command
             Command cmd = commands.Find(x => x.IsCommand(commandName));
-            if(cmd == null) throw new Exception($"Invalid command '{commandName}'");
+            if(cmd == null) throw new InvalidCommandException($"Invalid command '{commandName}'");
 
             //Cleans up the arguments, removing quotation marks and slashes
             for(int i = 0; i < args.Length; i++)
@@ -141,5 +141,10 @@ namespace Console_Mod_Manager
         {
             return string.Join(' ', commands.Select(x => x.Name));
         }
+    }
+
+    public class InvalidCommandException : Exception 
+    {
+        public InvalidCommandException(string message) : base(message) { }
     }
 }
