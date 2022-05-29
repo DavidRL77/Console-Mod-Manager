@@ -14,7 +14,7 @@ namespace Console_Mod_Manager
 
         //The paths
         public string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\ModManager";
-        public string profilesPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\ModManager\\profiles.json";
+        public string profilesFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + "\\ModManager\\profiles";
 
         public CommandParser profileCommands;
         public CommandParser modCommands;
@@ -56,6 +56,7 @@ namespace Console_Mod_Manager
                 new Command("delete", "Deletes a mod forever", "delete <index>", C_DeleteMod, "del", "remove", "de"),
                 new Command("rename", "Renames a mod", "rename <index> <new_name>", C_RenameMod, "re", "r"),
                 new Command("open", "Opens the directory of a mod or profile folder", "open mod/unused/exe/<index>", C_Open, "op", "go"),
+                new Command("sort", "Sorts the mods by the option specified", "sort name/date/enabled [descending]", C_Sort, "order", "orderby", "sortby"),
                 filterCommand
                 );
         }
@@ -263,7 +264,7 @@ namespace Console_Mod_Manager
             }
 
             lastCommandOutput = $"&gEdited profile '{profile.Name}'";
-            SaveProfiles();
+            profile.Save(profilesFolder);
         }
 
         public void C_DetailsProfile(string[] args)
@@ -306,7 +307,7 @@ namespace Console_Mod_Manager
             if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
             profile.Name = name;
             lastCommandOutput = $"&gProfile renamed to '{profile.Name}'";
-            SaveProfiles();
+            profile.Save(profilesFolder);
         }
         #endregion
 
@@ -400,6 +401,12 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = prevColor;
             Console.WriteLine(profile.ExecutablePath);
 
+            //Sort Type
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("Sort By: ");
+            Console.ForegroundColor = prevColor;
+            Console.WriteLine(profile.SortBy + " - " + (profile.SortAscending ? "Ascending" : "Descending"));
+
             Console.ForegroundColor = prevColor;
         }
 
@@ -440,34 +447,69 @@ namespace Console_Mod_Manager
             Console.WriteLine("Loading profiles...");
             string message = "";
 
-            if(!File.Exists(profilesPath))
+            profiles = new List<Profile>();
+            if(!Directory.Exists(profilesFolder))
             {
-                profiles = new List<Profile>();
+                Directory.CreateDirectory(profilesFolder);
             }
             else
             {
                 try
                 {
-                    profiles = JsonDataManager.Load<List<Profile>>(profilesPath);
-                    if(profiles == null) profiles = new List<Profile>();
+                    foreach(string file in Directory.GetFiles(profilesFolder))
+                    {
+                        try
+                        {
+                            if(Path.GetExtension(file) == ".json")
+                            {
+                                Profile profile = Profile.Load(file);
+                                if(profile != null) profiles.Add(profile);
+                            }
+                        }
+                        catch(Exception e)
+                        {
+                            message += $"Failed to load profile '{Path.GetFileName(file)}': {e.Message}\n";
+                        }
+                        
+                    }
                 }
                 catch(Exception e)
                 {
-                    profiles = new List<Profile>();
                     message = "Error while loading profiles: " + e.Message;
                 }
 
             }
 
             Console.Clear();
+
+            Console.ForegroundColor = ConsoleColor.Red;
             if(message != "") Console.WriteLine(message);
+            Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine(profiles.Count == 0 ? "No profiles found" : "Loaded " + profiles.Count + " profiles.");
         }
         public void SaveProfiles()
         {
             try
             {
-                JsonDataManager.Save(profiles, profilesPath, defaultOptions);
+                foreach(Profile profile in profiles)
+                {
+                    profile.Save(profilesFolder, defaultOptions);
+                }
+
+                //Deletes all the files that are not in the profiles list
+                foreach(string file in Directory.GetFiles(profilesFolder))
+                {
+                    if(Path.GetExtension(file) == ".json")
+                    {
+                        string name = Path.GetFileNameWithoutExtension(file);
+                        if(!profiles.Any(p => p.Name == name))
+                        {
+                            File.Delete(file);
+                        }
+                    }
+                }
+                
+                //JsonDataManager.Save(profiles, profilesFolder, defaultOptions);
             }
             catch(Exception e)
             {
@@ -578,7 +620,7 @@ namespace Console_Mod_Manager
                 FileSystemInfo mod = toggledMods[i];
                 Console.WriteLine($"{action}ing {mod.Name}...");
 
-                bool isEnabled = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
+                bool isEnabled = IsEnabled(mod);
                 if(mode == 1 && isEnabled) continue;
                 else if(mode == 2 && !isEnabled) continue;
 
@@ -706,7 +748,43 @@ namespace Console_Mod_Manager
             RenameFileSystemInfo(mod, newName);
             lastCommandOutput = $"&gRenamed {mod.Name} to {newName}";
         }
+        
+        public void C_Sort(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No options provided");
+            else if(args.Length > 2) throw new Exception("Too many arguments");
+
+            Profile.SortType sortType;
+            bool ascending = true;
+
+            switch(args[0])
+            {
+                case "name":
+                    sortType = Profile.SortType.Name;
+                    break;
+                case "date":
+                    sortType = Profile.SortType.Date;
+                    break;
+                case "enabled":
+                    sortType = Profile.SortType.Enabled;
+                    break;
+                default:
+                    throw new Exception("Invalid sort type");
+                    break;
+            }
+            if(args.Length > 1 && args[1].Contains("desc")) ascending = false;
+
+            currentProfile.SortBy = sortType;
+            currentProfile.SortAscending = ascending;
+            currentProfile.Save(profilesFolder);
+        }
+        
         #endregion
+
+        public bool IsEnabled(FileSystemInfo mod)
+        {
+            return Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.ModsPath);
+        }
 
         public void AutoToggleMod(int index)
         {
@@ -811,7 +889,26 @@ namespace Console_Mod_Manager
             {
                 mods = new DirectoryInfo(currentProfile.ModsPath).GetFileSystemInfos();
                 unusedMods = new DirectoryInfo(currentProfile.UnusedModsPath).GetFileSystemInfos();
-                allMods = mods.Concat(unusedMods).ToArray();
+                IEnumerable<FileSystemInfo> unsortedMods = mods.Concat(unusedMods);
+
+                switch(currentProfile.SortBy)
+                {
+                    case Profile.SortType.Name:
+                        if(currentProfile.SortAscending) unsortedMods = unsortedMods.OrderBy(m => m.Name);
+                        else unsortedMods = unsortedMods.OrderByDescending(m => m.Name);
+                        break;
+                    case Profile.SortType.Date:
+                        if(currentProfile.SortAscending) unsortedMods = unsortedMods.OrderBy(m => m.CreationTime);
+                        else unsortedMods = unsortedMods.OrderByDescending(m => m.CreationTime);
+                        break;
+                    case Profile.SortType.Enabled:
+                        if(currentProfile.SortAscending) unsortedMods = unsortedMods.OrderBy(m => IsEnabled(m));
+                        else unsortedMods = unsortedMods.OrderByDescending(m => IsEnabled(m));
+                        break;
+                    default:
+                        break;
+                }
+                allMods = unsortedMods.ToArray();
 
                 //Checks for duplicates
                 duplicateIndex = FindFirstDuplicate(mods, unusedMods);

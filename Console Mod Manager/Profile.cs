@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
+using System.Text.Json;
 
 namespace Console_Mod_Manager
 {
@@ -23,8 +24,18 @@ namespace Console_Mod_Manager
         }
         private string executablePath;
 
+        public SortType SortBy { get; set; }
+        public bool SortAscending { get; set; }
 
-        public Profile(string name, string modsPath, string unusedModsPath, string executablePath = null)
+        public enum SortType 
+        {
+            Name,
+            Date,
+            Enabled
+        };
+
+
+        public Profile(string name, string modsPath, string unusedModsPath, string executablePath = null, SortType sortBy = SortType.Name, bool sortAscending = true)
         {
             if(Path.GetFullPath(modsPath).Equals(Path.GetFullPath(unusedModsPath))) throw new Exception("The mods folder and unused mods folder cannot be the same");
 
@@ -32,7 +43,19 @@ namespace Console_Mod_Manager
             ModsPath = modsPath;
             UnusedModsPath = unusedModsPath;
             ExecutablePath = executablePath;
+            SortBy = sortBy;
+            SortAscending = sortAscending;
         }
-       
+        
+        public void Save(string folderPath, JsonSerializerOptions options = null)
+        {
+            JsonDataManager.Save(this, Path.Join(folderPath, Name + ".json"), options);
+        }
+
+        public static Profile Load(string filePath, JsonSerializerOptions options = null)
+        {
+            return JsonDataManager.Load<Profile>(filePath, options);
+        }
+
     }
 }
