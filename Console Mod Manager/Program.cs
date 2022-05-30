@@ -129,8 +129,14 @@ namespace Console_Mod_Manager
                 }
                 catch(Exception e) //If it fails, it saves the error message in red
                 {
-                    errorAction?.Invoke(answer, e);
-                    //lastCommandOutput = "&rError: " + e.Message;
+                    try
+                    {
+                        errorAction?.Invoke(answer, e);
+                    }
+                    catch(Exception e2)
+                    {
+                        lastCommandOutput = "&rError: " + e2.Message;
+                    }
                 }
 
                 Console.Clear();
@@ -152,6 +158,7 @@ namespace Console_Mod_Manager
                     lastCommandOutput = "&rError: " + e.Message;
                 }
             }
+            else lastCommandOutput = "&rError: " + e.Message;
 
         }
 
@@ -361,7 +368,7 @@ namespace Console_Mod_Manager
                     }
                 }
 
-                throw new Exception("Please enter a number or full name of profile");
+                throw new Exception($"Could not find profile with name '{index}'");
             }
         }
 
@@ -915,7 +922,7 @@ namespace Console_Mod_Manager
                     }
                 }
 
-                throw new Exception("Please enter a number or full name of mod");
+                throw new Exception($"Could not find mod by name '{index}'");
             }
         }
 
