@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using static Console_Mod_Manager.Utilities;
 
 namespace Console_Mod_Manager
 {
@@ -366,6 +367,7 @@ namespace Console_Mod_Manager
             int i = GetProfileIndex(index);
             return GetProfile(i);
         }
+        
         public Profile GetProfile(int index)
         {
             if(index >= profiles.Count) throw new Exception("Index out of range");
@@ -381,14 +383,8 @@ namespace Console_Mod_Manager
             }
             else
             {
-                for(int j = 0; j < profiles.Count; j++)
-                {
-                    if(profiles[j].Name.Equals(index, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return j;
-                    }
-                }
-
+                Profile p = GetUniqueElement(profiles, p => p.Name.ToLower().StartsWith(index.ToLower()));
+                if(p != null) return profiles.IndexOf(p);
                 throw new Exception($"Could not find profile with name '{index}'");
             }
         }
@@ -404,6 +400,8 @@ namespace Console_Mod_Manager
 
             }
             if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
+
+            if(profiles.Any(p => p.Name.ToLower() == name.ToLower())) throw new Exception("Profile with that name already exists");
 
             //Mods folder
             if(modsFolder == "")
@@ -914,6 +912,7 @@ namespace Console_Mod_Manager
         {
             MoveFileSystemInfo(file, Directory.GetParent(file.FullName) + "\\" + newName);
         }
+        
         public void DeleteFileSystemInfo(FileSystemInfo file, bool recursive = false)
         {
             if(IsDirectory(file.FullName))
@@ -931,6 +930,7 @@ namespace Console_Mod_Manager
             int i = GetModIndex(index);
             return GetMod(i);
         }
+        
         public FileSystemInfo GetMod(int index)
         {
             if(index >= allMods.Length) throw new Exception("Index out of range");
@@ -940,20 +940,14 @@ namespace Console_Mod_Manager
 
         public int GetModIndex(string index)
         {
-            int i;
-            if(int.TryParse(index, out i))
+            if(int.TryParse(index, out int i))
             {
                 return i;
             }
             else
             {
-                for(int j = 0; j < allMods.Length; j++)
-                {
-                    if(allMods[j].Name.Equals(index, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return j;
-                    }
-                }
+                FileSystemInfo mod = GetUniqueElement(allMods, m => m.Name.ToLower().StartsWith(index.ToLower()));
+                if(mod != null) return Array.IndexOf(allMods, mod);
 
                 throw new Exception($"Could not find mod by name '{index}'");
             }
@@ -1072,124 +1066,6 @@ namespace Console_Mod_Manager
             }
             Console.ForegroundColor = prevColor;
             Console.WriteLine();
-        }
-
-        /// <summary>
-        /// Will return the index of the first duplicate found, otherwise -1
-        /// </summary>
-        /// <param name="first"></param>
-        /// <param name="second"></param>
-        /// <returns></returns>
-        public int FindFirstDuplicate(FileSystemInfo[] first, FileSystemInfo[] second)
-        {
-            for(int i = 0; i < first.Length; i++)
-            {
-                string current = first[i].Name;
-                for(int j = 0; j < second.Length; j++)
-                {
-                    FileSystemInfo secondCurrent = second[j];
-                    if(secondCurrent.Name == current)
-                    {
-                        return j;
-                    }
-                }
-            }
-            return -1;
-        }
-
-        public bool PassesFilter(string stringToCheck, string filter)
-        {
-            if(filter == "") return true;
-
-            stringToCheck = stringToCheck.ToLower();
-            filter = filter.ToLower();
-
-            string[] filterSplit = filter.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-            if(!filterSplit.Contains("||")) //No logical operators used
-            {
-                //The fast check, returns as soon as a word evaluates false
-                for(int i = 0; i < filterSplit.Length; i++)
-                {
-                    string current = filterSplit[i];
-
-                    if(current.StartsWith('-') && current.Length > 1) //If the filter starts with a '-' and it has something after it
-                    {
-                        if(stringToCheck.Contains(current[1..])) return false;
-                    }
-                    else
-                    {
-                        if(!stringToCheck.Contains(current)) return false;
-                    }
-
-                }
-                return true;
-            }
-            else
-            {
-                bool orOperator = false;
-                bool passed = false;
-
-                //The bool operator check
-                for(int i = 0; i < filterSplit.Length; i++)
-                {
-                    string current = filterSplit[i];
-
-                    if(current == "||")
-                    {
-                        orOperator = true;
-                        continue;
-                    }
-
-                    //If the first result in the 'or' operation was true, no need to check the rest
-                    if(orOperator && passed) {orOperator = false; continue; }
-                    if(current.StartsWith('-') && current.Length > 1) //If the filter starts with a '-' and it has something after it
-                    {
-                        if(stringToCheck.Contains(current[1..])) passed = false;
-                        else passed = true;
-                    }
-                    else
-                    {
-                        if(!stringToCheck.Contains(current)) passed = false;
-                        else passed = true;
-                    }
-
-                    //Returns false when:
-                    //It is the last word in an 'or' operation and it didn't pass
-                    //It isn't an 'or' operation and it didn't pass
-                    //Always check at least the first two words before returning false
-                    if(!passed && i > 0) return false;
-
-                    orOperator = false;
-                }
-                return true;
-            }
-        }
-
-        public bool IsDirectory(string path)
-        {
-            FileAttributes attr = File.GetAttributes(path);
-            return attr.HasFlag(FileAttributes.Directory);
-        }
-        public bool YesNoAnswer(string question, ConsoleColor color = ConsoleColor.Cyan)
-        {
-            ConsoleColor prevColor = Console.ForegroundColor;
-
-            Console.ForegroundColor = color;
-            Console.WriteLine(question + "(y/n)");
-            Console.ForegroundColor = prevColor;
-
-            ConsoleKeyInfo key;
-            do
-            {
-                key = Console.ReadKey(true);
-                if(key.KeyChar == 'y') { Console.WriteLine("y"); return true; }
-                if(key.KeyChar == 'n') { Console.WriteLine("n"); return false; }
-            } while(key.Key != ConsoleKey.Escape);
-
-
-            Console.WriteLine("Esc");
-            throw new Exception("Aborted");
         }
     }
 }
