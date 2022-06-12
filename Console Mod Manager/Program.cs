@@ -152,8 +152,8 @@ namespace Console_Mod_Manager
             {
                 try
                 {
-                    if(currentMenu == MenuType.Profiles) profileCommands.IndexAction(GetProfileIndex(command));
-                    else if(currentMenu == MenuType.Mods) modCommands.IndexAction(GetModIndex(command));
+                    if(currentMenu == MenuType.Profiles) profileCommands.IndexAction(profiles.GetIndexFromString(command, p => p.Name));
+                    else if(currentMenu == MenuType.Mods) modCommands.IndexAction(allMods.GetIndexFromString(command, m => m.Name));
                 }
                 catch
                 {
@@ -206,7 +206,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index specified");
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
-            Profile profile = GetProfile(args[0]);
+            Profile profile = profiles.GetElement(args[0], p => p.Name);
             int index = int.Parse(args[0]);
 
             //Asks for confirmation, if no, then cancel
@@ -229,7 +229,7 @@ namespace Console_Mod_Manager
             string parameter = "";
             string newPath = "";
 
-            Profile profile = GetProfile(args[0]);
+            Profile profile = profiles.GetElement(args[0], p => p.Name);
 
             if(args.Length >= 2) parameter = args[1];
             if(args.Length == 3) newPath = args[2];
@@ -302,7 +302,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index specified");
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
-            Profile profile = GetProfile(args[0]);
+            Profile profile =  profiles.GetElement(args[0], p => p.Name);
 
             DisplayDetails(profile);
 
@@ -315,7 +315,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index specified");
             if(args.Length > 1) throw new Exception("Too many arguments");
 
-            Profile profile = GetProfile(args[0]);
+            Profile profile =  profiles.GetElement(args[0], p => p.Name);
             LoadProfile(profile);
         }
 
@@ -324,7 +324,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index specified");
             else if(args.Length > 2) throw new Exception("Too many arguments");
 
-            Profile profile = GetProfile(args[0]);
+            Profile profile =  profiles.GetElement(args[0], p => p.Name);
 
             string name = args.Length == 2 ? args[1] : "";
             if(name == "")
@@ -345,8 +345,8 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index specified");
             else if(args.Length > 2) throw new Exception("Too many arguments");
 
-            Profile profile = GetProfile(args[0]);
-            Profile profile2 = GetProfile(args[1]);
+            Profile profile =  profiles.GetElement(args[0], p => p.Name);
+            Profile profile2 = profiles.GetElement(args[1], p => p.Name);
 
             int index = profiles.IndexOf(profile);
             int index2 = profiles.IndexOf(profile2);
@@ -361,33 +361,6 @@ namespace Console_Mod_Manager
             lastCommandOutput = $"&gMoved profile '{profile.Name}' to index {index2}";
         }
         #endregion
-
-        public Profile GetProfile(string index)
-        {
-            int i = GetProfileIndex(index);
-            return GetProfile(i);
-        }
-        
-        public Profile GetProfile(int index)
-        {
-            if(index >= profiles.Count) throw new Exception("Index out of range");
-            else if(index < 0) throw new Exception("Index must be positive");
-            return profiles[index];
-        }
-
-        public int GetProfileIndex(string index)
-        {
-            if(int.TryParse(index, out int i))
-            {
-                return i;
-            }
-            else
-            {
-                Profile p = GetUniqueElement(profiles, p => p.Name.ToLower().StartsWith(index.ToLower()));
-                if(p != null) return profiles.IndexOf(p);
-                throw new Exception($"Could not find profile with name '{index}'");
-            }
-        }
 
         public void CreateProfile(string name = "", string modsFolder = "", string unusedModsFolder = "", string executablePath = "")
         {
@@ -613,7 +586,7 @@ namespace Console_Mod_Manager
 
         public void EnterIndexProfile(int index)
         {
-            Profile profile = GetProfile(index);
+            Profile profile = profiles.GetElement(index);
             LoadProfile(profile);
         }
 
@@ -677,7 +650,7 @@ namespace Console_Mod_Manager
                 }
                 else
                 {
-                    FileSystemInfo mod = GetMod(currentIndex);
+                    FileSystemInfo mod = allMods.GetElement(currentIndex, m => m.Name);
                     toggledMods.Add(mod);
                 }
             }
@@ -769,7 +742,7 @@ namespace Console_Mod_Manager
             }
             else
             {
-                FileSystemInfo mod = GetMod(arg);
+                FileSystemInfo mod = allMods.GetElement(arg, m => m.Name);
                 path = mod.FullName;
             }
 
@@ -788,7 +761,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index provided");
             else if(args.Length > 1) throw new Exception("Too many arguments");
 
-            FileSystemInfo mod = GetMod(args[0]);
+            FileSystemInfo mod = allMods.GetElement(args[0], m => m.Name);
 
             if(!YesNoAnswer($"Delete '{mod.Name}' forever? "))
             {
@@ -806,7 +779,7 @@ namespace Console_Mod_Manager
             if(args.Length == 0) throw new Exception("No index provided");
             else if(args.Length > 2) throw new Exception("Too many arguments");
 
-            FileSystemInfo mod = GetMod(args[0]);
+            FileSystemInfo mod = allMods.GetElement(args[0], m => m.Name);
 
             string newName = "";
             if(args.Length == 2) newName = args[1];
@@ -862,14 +835,14 @@ namespace Console_Mod_Manager
 
         public void AutoToggleMod(int index)
         {
-            FileSystemInfo mod = GetMod(index);
+            FileSystemInfo mod = allMods.GetElement(index);
             bool enable = Directory.GetParent(mod.FullName).FullName.Equals(currentProfile.UnusedModsPath);
             ToggleMod(mod, enable);
         }
 
         public void ToggleMod(int index, bool enable, bool log = true)
         {
-            FileSystemInfo mod = GetMod(index);
+            FileSystemInfo mod = allMods.GetElement(index);
             ToggleMod(mod, enable, log);
         }
 
@@ -922,34 +895,6 @@ namespace Console_Mod_Manager
             else
             {
                 File.Delete(file.FullName);
-            }
-        }
-
-        public FileSystemInfo GetMod(string index)
-        {
-            int i = GetModIndex(index);
-            return GetMod(i);
-        }
-        
-        public FileSystemInfo GetMod(int index)
-        {
-            if(index >= allMods.Length) throw new Exception("Index out of range");
-            else if(index < 0) throw new Exception("Index must be positive");
-            return allMods[index];
-        }
-
-        public int GetModIndex(string index)
-        {
-            if(int.TryParse(index, out int i))
-            {
-                return i;
-            }
-            else
-            {
-                FileSystemInfo mod = GetUniqueElement(allMods, m => m.Name.ToLower().StartsWith(index.ToLower()));
-                if(mod != null) return Array.IndexOf(allMods, mod);
-
-                throw new Exception($"Could not find mod by name '{index}'");
             }
         }
 
