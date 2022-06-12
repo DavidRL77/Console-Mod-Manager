@@ -26,6 +26,7 @@ namespace Console_Mod_Manager
 
         public SortType SortBy { get; set; }
         public bool SortAscending { get; set; }
+        public int Index { get; set; }
 
         public enum SortType 
         {
@@ -35,13 +36,14 @@ namespace Console_Mod_Manager
         };
 
 
-        public Profile(string name, string modsPath, string unusedModsPath, string executablePath = null, SortType sortBy = SortType.Name, bool sortAscending = true)
+        public Profile(string name, string modsPath, string unusedModsPath, int index, string executablePath = null, SortType sortBy = SortType.Name, bool sortAscending = true)
         {
             if(Path.GetFullPath(modsPath).Equals(Path.GetFullPath(unusedModsPath))) throw new Exception("The mods folder and unused mods folder cannot be the same");
 
             Name = name;
             ModsPath = modsPath;
             UnusedModsPath = unusedModsPath;
+            Index = index;
             ExecutablePath = executablePath;
             SortBy = sortBy;
             SortAscending = sortAscending;

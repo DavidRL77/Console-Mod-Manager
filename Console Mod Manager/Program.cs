@@ -49,6 +49,7 @@ namespace Console_Mod_Manager
                 new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
                 new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
                 new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
+                new Command("move", "Moves a profile", "move <index> <new_index>", C_MoveProfile, "position"),
                 filterCommand
                 );
 
@@ -292,7 +293,7 @@ namespace Console_Mod_Manager
             }
 
             lastCommandOutput = $"&gEdited profile '{profile.Name}'";
-            profile.Save(profilesFolder);
+            profile.Save(profilesFolder, defaultOptions);
         }
 
         public void C_DetailsProfile(string[] args)
@@ -335,7 +336,28 @@ namespace Console_Mod_Manager
             if(string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name)) throw new Exception("Name cannot be empty");
             profile.Name = name;
             lastCommandOutput = $"&gProfile renamed to '{profile.Name}'";
-            profile.Save(profilesFolder);
+            profile.Save(profilesFolder, defaultOptions);
+        }
+
+        public void C_MoveProfile(string[] args)
+        {
+            if(args.Length == 0) throw new Exception("No index specified");
+            else if(args.Length > 2) throw new Exception("Too many arguments");
+
+            Profile profile = GetProfile(args[0]);
+            Profile profile2 = GetProfile(args[1]);
+
+            int index = profiles.IndexOf(profile);
+            int index2 = profiles.IndexOf(profile2);
+
+            if(index == index2) throw new Exception("Cannot move profile to itself");
+
+            profile.Index = index2;
+            profiles.RemoveAt(index);
+            profiles.Insert(index2, profile);
+            SaveProfiles();
+            SortProfiles();
+            lastCommandOutput = $"&gMoved profile '{profile.Name}' to index {index2}";
         }
         #endregion
 
@@ -353,8 +375,7 @@ namespace Console_Mod_Manager
 
         public int GetProfileIndex(string index)
         {
-            int i;
-            if(int.TryParse(index, out i))
+            if(int.TryParse(index, out int i))
             {
                 return i;
             }
@@ -414,7 +435,7 @@ namespace Console_Mod_Manager
             }
             if(executablePath != null && !File.Exists(executablePath)) throw new FileNotFoundException($"File '{executablePath}' does not exist");
 
-            profiles.Add(new Profile(name, modsFolder, unusedModsFolder, executablePath));
+            profiles.Add(new Profile(name, modsFolder, unusedModsFolder, profiles.Count, executablePath));
             SaveProfiles();
         }
 
@@ -485,6 +506,7 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = prevColor;
             Console.WriteLine();
         }
+        
         public void LoadProfiles()
         {
             Console.WriteLine("Loading profiles...");
@@ -523,6 +545,8 @@ namespace Console_Mod_Manager
 
             }
 
+            SortProfiles();
+
             Console.Clear();
 
             Console.ForegroundColor = ConsoleColor.Red;
@@ -530,13 +554,17 @@ namespace Console_Mod_Manager
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine(profiles.Count == 0 ? "No profiles found" : "Loaded " + profiles.Count + " profiles.");
         }
+        
+
         public void SaveProfiles()
         {
             try
             {
-                foreach(Profile profile in profiles)
+                for(int i = 0; i < profiles.Count; i++)
                 {
-                    profile.Save(profilesFolder, defaultOptions);
+                    profiles[i].Index = i;
+                    profiles[i].Save(profilesFolder, defaultOptions);
+
                 }
 
                 //Deletes all the files that are not in the profiles list
@@ -559,6 +587,12 @@ namespace Console_Mod_Manager
                 Console.WriteLine("Error while saving profiles: " + e.Message);
             }
         }
+        
+        public void SortProfiles()
+        {
+            if(profiles.Count > 0) profiles = profiles.OrderBy(p => p.Index).ToList();
+        }
+
         public void ClearLine()
         {
             int top = Console.CursorTop;
@@ -813,13 +847,12 @@ namespace Console_Mod_Manager
                     break;
                 default:
                     throw new Exception("Invalid sort type");
-                    break;
             }
             if(args.Length > 1 && args[1].Contains("desc")) ascending = false;
 
             currentProfile.SortBy = sortType;
             currentProfile.SortAscending = ascending;
-            currentProfile.Save(profilesFolder);
+            currentProfile.Save(profilesFolder, defaultOptions);
         }
         
         #endregion
