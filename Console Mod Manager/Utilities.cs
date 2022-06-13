@@ -204,7 +204,7 @@ namespace Console_Mod_Manager
                 T element = GetUniqueElement(collection, m => propertyToCompare(m).ToLower().StartsWith(name.ToLower()));
                 if(element != null) return collection.IndexOf(element);
 
-                throw new Exception($"Could not find element with name '{name}'");
+                throw new Exception($"Could not find element with name '{name}', or multiple elements match");
             }
         }
     }

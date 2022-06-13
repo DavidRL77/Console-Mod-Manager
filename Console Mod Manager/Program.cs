@@ -152,6 +152,7 @@ namespace Console_Mod_Manager
             {
                 try
                 {
+                    if(command.Length <= 1) throw new Exception("Input is too short to look for a name");
                     if(currentMenu == MenuType.Profiles) profileCommands.IndexAction(profiles.GetIndexFromString(command, p => p.Name));
                     else if(currentMenu == MenuType.Mods) modCommands.IndexAction(allMods.GetIndexFromString(command, m => m.Name));
                 }
