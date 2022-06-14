@@ -132,6 +132,17 @@ namespace Console_Mod_Manager
             else cmd.Execute(args);
         }
         
+        public string[] GetAllCommands(bool includeAliases = false)
+        {
+            List<string> commands = new List<string>();
+            foreach(Command command in this.commands)
+            {
+                commands.Add(command.Name);
+                if(includeAliases) commands.AddRange(command.Aliases);
+            }
+            return commands.ToArray();
+        }
+        
         public string ParseToString(char separator)
         {
             return string.Join(separator, commands.Select(x => x.Name));
@@ -141,6 +152,7 @@ namespace Console_Mod_Manager
         {
             return string.Join(' ', commands.Select(x => x.Name));
         }
+
     }
 
     public class InvalidCommandException : Exception 
