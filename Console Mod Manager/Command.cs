@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Custom_Utils_V2;
 
 namespace Console_Mod_Manager
 {
@@ -57,16 +58,16 @@ namespace Console_Mod_Manager
         /// <param name="helpAction"></param>
         public Action<int> IndexAction { get; set; }
 
+        public AutoCompleter autoCompleter;
+
         public CommandParser(Action<string> helpAction)
         {
-            commands = new List<Command>();
-            HelpAction = helpAction;
+            Init(helpAction);;
         }
 
         public CommandParser(Action<string> helpAction, params Command[] commands)
         {
-            this.commands = commands.ToList();
-            HelpAction = helpAction;
+            Init(helpAction, commands: commands);
         }
         
         /// <summary>
@@ -77,9 +78,18 @@ namespace Console_Mod_Manager
         /// <param name="commands"></param>
         public CommandParser(Action<string> helpAction, Action<int> indexAction, params Command[] commands)
         {
-            this.commands = commands.ToList();
-            IndexAction = indexAction;
-            HelpAction = helpAction;
+            Init(helpAction, indexAction, commands);
+        }
+
+        public void Init(Action<string> helpAction, Action<int> indexAction = null, params Command[] commands)
+        {
+            this.HelpAction = helpAction;
+            this.IndexAction = indexAction;
+
+            if(commands.Length > 0) this.commands = commands.ToList();
+            else this.commands = new List<Command>();
+
+            autoCompleter = new AutoCompleter(GetAllCommands(false), true, false);
         }
 
         public void AddCommand(Command command)
@@ -97,6 +107,11 @@ namespace Console_Mod_Manager
         public void SetCommands(params Command[] commandRange)
         {
             commands = commandRange.ToList();
+        }
+
+        public string ReadLine()
+        {
+            return autoCompleter.ReadLine();
         }
 
         public void TryExecute(string command)

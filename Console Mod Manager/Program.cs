@@ -114,7 +114,7 @@ namespace Console_Mod_Manager
                 }
 
                 //Asks for user input
-                answer = Console.ReadLine();
+                answer = commandParser.ReadLine();
 
                 if(answer == "exit") break; //Self explanatory
                 else if(string.IsNullOrEmpty(answer) || string.IsNullOrWhiteSpace(answer)) //If the command is empty, don't do anything

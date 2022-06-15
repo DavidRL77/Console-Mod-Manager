@@ -12,4 +12,10 @@
     <Content Include="images\Mod Manager Icon.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="Custom Utils V2">
+      <HintPath>..\..\Custom Utils V2\Custom Utils V2\bin\Debug\net5.0\Custom Utils V2.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
