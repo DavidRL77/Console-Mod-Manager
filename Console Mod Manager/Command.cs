@@ -62,7 +62,7 @@ namespace Console_Mod_Manager
 
         public CommandParser(Action<string> helpAction)
         {
-            Init(helpAction);;
+            Init(helpAction);
         }
 
         public CommandParser(Action<string> helpAction, params Command[] commands)
