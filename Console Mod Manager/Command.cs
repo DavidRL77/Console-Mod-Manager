@@ -89,7 +89,7 @@ namespace Console_Mod_Manager
             if(commands.Length > 0) this.commands = commands.ToList();
             else this.commands = new List<Command>();
 
-            autoCompleter = new AutoCompleter(GetAllCommands(true).Where(c => c.Length > 2).ToArray(), true, false);
+            autoCompleter = new AutoCompleter(GetAllCommands(true).Where(c => c.Length > 2).ToArray(), false, false);
         }
 
         public void AddCommand(Command command)

@@ -46,7 +46,7 @@ namespace Console_Mod_Manager
             profileCommands = new CommandParser(helpAction: DisplayHelp, indexAction: EnterIndexProfile,
                 new Command("create", "Creates a new profile", "create <name> <mods_folder> <unused_mods_folder>", C_CreateProfile, "cr", "c"),
                 new Command("delete", "Deletes a profile", "delete <index>", C_DeleteProfile, "de", "d", "del", "remove"),
-                new Command("edit", "Edits the path of a folder in a profile", "change mod/unused/exe <new_path>", C_EditProfile, "change", "ch", "ed"),
+                new Command("edit", "Edits the path of a folder in a profile", "<index> change mod/unused/exe <new_path>", C_EditProfile, "change", "ch", "ed"),
                 new Command("details", "Shows all the details of a profile", "details <index>", C_DetailsProfile, "see", "type", "detail"),
                 new Command("load", "Loads a profile", "load <index>", C_EnterProfile, "enter", "en"),
                 new Command("rename", "Renames a profile", "rename <index> <new_name>", C_RenameProfile, "re", "r"),
@@ -83,18 +83,16 @@ namespace Console_Mod_Manager
                 startAction?.Invoke();
 
                 Console.ForegroundColor = ConsoleColor.Gray;
-                //Displays all the commands
-                Console.WriteLine($"Enter a command ({commandParser.ParseToString('/')}) or 'exit' to exit");
+
 
                 //Before asking for user input, it displays the last command output
                 if(lastCommandOutput != "")
                 {
                     //Stores all the info before changing anything
-                    int top = Console.CursorTop;
                     ConsoleColor prevColor = Console.ForegroundColor;
 
 
-                    //Determins what color the output should be
+                    //Determins what color the output should be. (Can't use switch statement because of StartsWith)
                     bool colored = true;
                     if(lastCommandOutput.StartsWith("&r")) Console.ForegroundColor = ConsoleColor.Red;
                     else if(lastCommandOutput.StartsWith("&g")) Console.ForegroundColor = ConsoleColor.Green;
@@ -106,12 +104,15 @@ namespace Console_Mod_Manager
 
                     if(colored) lastCommandOutput = lastCommandOutput[2..];
 
-                    Console.WriteLine("\n\n" + lastCommandOutput);
+                    Console.WriteLine(lastCommandOutput);
                     lastCommandOutput = "";
-                    Console.CursorTop = top;
 
                     Console.ForegroundColor = prevColor;
                 }
+
+                //Displays all the commands
+                Console.WriteLine($"Enter a command ({commandParser.ParseToString('/')}) or 'exit' to exit");
+
 
                 //Asks for user input
                 answer = commandParser.ReadLine();
